@@ -123,32 +123,34 @@ function drawHoop(ctx: CanvasRenderingContext2D, side: 'left' | 'right', flash: 
   roundRect(ctx, poleX - 7, RIM_Y - 30, 14, FLOOR_Y - (RIM_Y - 30), 7); ctx.stroke();
   // pole pad with BP
   const padY = RIM_Y + 120;
-  ctx.fillStyle = '#0e1a0c';
+  const padg = ctx.createLinearGradient(poleX - 11, padY, poleX + 11, padY);
+  padg.addColorStop(0, '#3a9e1c'); padg.addColorStop(0.5, '#7dff43'); padg.addColorStop(1, '#3a9e1c');
+  ctx.fillStyle = padg;
   roundRect(ctx, poleX - 11, padY, 22, 120, 8); ctx.fill();
-  ctx.fillStyle = '#7dff43'; ctx.font = '900 13px Segoe UI, sans-serif';
+  ctx.fillStyle = '#0a1f08'; ctx.font = '900 13px Segoe UI, sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.save(); ctx.translate(poleX, padY + 60); ctx.fillText('BP', 0, 0); ctx.restore();
 
-  // ---- backboard (dark green branded glass) ----
+  // ---- backboard (bright branded green glass) ----
   const bbW = 16, bbH = 116;
   const bbX = side === 'left' ? poleX + 4 : poleX - 4 - bbW;
   const bbY = RIM_Y - 70;
   const bbg = ctx.createLinearGradient(bbX, bbY, bbX + bbW, bbY + bbH);
-  bbg.addColorStop(0, 'rgba(18,40,16,.94)'); bbg.addColorStop(1, 'rgba(10,24,9,.94)');
+  bbg.addColorStop(0, 'rgba(125,255,67,.96)'); bbg.addColorStop(1, 'rgba(58,158,28,.96)');
   ctx.fillStyle = bbg;
   roundRect(ctx, bbX, bbY, bbW, bbH, 5); ctx.fill();
-  // glow frame (green, brightens on score)
-  ctx.strokeStyle = scored ? '#7dff43' : 'rgba(125,255,67,.7)';
+  // glow frame (brightens on score)
+  ctx.strokeStyle = scored ? '#eaffd8' : 'rgba(10,31,8,.55)';
   ctx.lineWidth = scored ? 4 : 2.5;
   if (scored) { ctx.shadowColor = '#7dff43'; ctx.shadowBlur = 20; }
   roundRect(ctx, bbX, bbY, bbW, bbH, 5); ctx.stroke();
   ctx.shadowBlur = 0;
   // shooter's square (white, target on the inward face)
   const sqX = side === 'left' ? bbX + bbW - 9 : bbX + 1;
-  ctx.strokeStyle = 'rgba(244,248,240,.95)'; ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5;
   ctx.strokeRect(sqX, RIM_Y - 24, 8, 24);
   // BP mark on the board
-  ctx.fillStyle = 'rgba(125,255,67,.85)'; ctx.font = '900 11px Segoe UI, sans-serif';
+  ctx.fillStyle = 'rgba(10,31,8,.9)'; ctx.font = '900 11px Segoe UI, sans-serif';
   ctx.save(); ctx.translate(bbX + bbW / 2, bbY + 16); ctx.fillText('BP', 0, 0); ctx.restore();
 
   // ---- rim arm + hanger ----
