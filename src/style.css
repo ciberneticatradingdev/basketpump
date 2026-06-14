@@ -22,6 +22,16 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
   background-image:repeating-linear-gradient(45deg,#fff 0 2px,transparent 2px 22px);}
 .menu-inner{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:10px;width:min(92vw,440px);padding:24px 0;text-align:center}
 .menu-logo{width:min(78vw,330px);filter:drop-shadow(0 16px 40px rgba(0,0,0,.7)) drop-shadow(0 0 24px rgba(86,196,43,.25));}
+.ca-bar{display:flex;align-items:center;gap:8px;width:100%;justify-content:center}
+.ca-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:var(--ink-2);color:var(--white);font-family:var(--font);font-weight:700;font-size:12px;cursor:pointer;transition:.15s;max-width:300px}
+.ca-chip:hover{border-color:var(--green);box-shadow:0 4px 16px rgba(86,196,43,.22)}
+.ca-label{background:linear-gradient(180deg,var(--green),var(--green-2));color:#06210a;font-weight:900;font-size:11px;letter-spacing:1px;padding:2px 7px;border-radius:6px}
+.ca-value{color:var(--muted);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ca-value.set{color:var(--green-glow)}
+.ca-copy{color:var(--muted);font-size:14px}
+.ca-chip:hover .ca-copy{color:var(--green-glow)}
+.x-link{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--ink-2);color:var(--white);transition:.15s;flex-shrink:0}
+.x-link:hover{border-color:var(--green);color:var(--green-glow);transform:translateY(-2px);box-shadow:0 6px 18px rgba(86,196,43,.25)}
 .tagline{font-weight:800;letter-spacing:2px;font-size:15px;color:var(--white);margin-top:-2px}
 .tagline .g{color:var(--green-glow);text-shadow:0 0 18px rgba(125,255,67,.5)}
 .menu-card{width:100%;background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:14px;box-shadow:0 12px 40px rgba(0,0,0,.5)}

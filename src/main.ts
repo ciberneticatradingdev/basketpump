@@ -461,3 +461,29 @@ function endMatch(h: number, a: number) {
 }
 
 console.log('%cBASKETPUMP', 'color:#7dff43;font-weight:900;font-size:20px', '— Play Hard. Pump High.');
+
+// ---------- CONTRACT ADDRESS ----------
+// Set this string when the token launches; until then it shows "will update soon".
+const CONTRACT_ADDRESS = ''; // e.g. 'So1aNa...pump'
+(() => {
+  const chip = document.querySelector('#ca-chip') as HTMLButtonElement | null;
+  const valEl = document.querySelector('#ca-value') as HTMLElement | null;
+  const copyEl = document.querySelector('#ca-copy') as HTMLElement | null;
+  if (!chip || !valEl) return;
+  const ca = CONTRACT_ADDRESS.trim();
+  if (ca) {
+    valEl.textContent = ca.length > 16 ? `${ca.slice(0, 6)}…${ca.slice(-5)}` : ca;
+    valEl.classList.add('set');
+    chip.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(ca);
+        if (copyEl) { const o = copyEl.textContent; copyEl.textContent = '✓'; setTimeout(() => { if (copyEl) copyEl.textContent = o; }, 1200); }
+      } catch { /* clipboard blocked — no-op */ }
+    });
+  } else {
+    valEl.textContent = 'will update soon';
+    if (copyEl) copyEl.style.display = 'none';
+    chip.style.cursor = 'default';
+  }
+})();
+
