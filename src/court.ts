@@ -158,93 +158,219 @@ function drawHoop(ctx: CanvasRenderingContext2D, side: 'left' | 'right', flash: 
   ctx.restore();
 }
 
-// ===== Players (cartoon humanoid, side view) =====
+// ===== Players (articulated cartoon baller, side view) =====
 export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, hasBall: boolean) {
-  const col = p.team === 'home' ? '#56c42b' : '#e23b3b';
+  const col = p.team === 'home' ? '#5cd02e' : '#ec4040';
   const dark = p.team === 'home' ? '#2f7a14' : '#9c2323';
+  const trim = p.team === 'home' ? '#bfff58' : '#ffd0d0';
+  const skin = '#f2c79a', skinDark = '#d9a774';
+  const f = p.faceDir;
   const feetY = p.y;
-  const squash = p.pumpT;                          // 0..1 crouch
-  const bodyH = PLAYER_H * (1 - squash * 0.18);
-  const headR = 17;
-  const hipY = feetY - bodyH * 0.42;
-  const shoulderY = feetY - bodyH * 0.78;
-  const headY = feetY - bodyH + headR * 0.2;
+  const squash = p.pumpT;                            // 0..1 crouch anticipation
+  const bodyH = PLAYER_H * (1 - squash * 0.14);
+  const hipY = feetY - bodyH * 0.46;
+  const shoulderY = feetY - bodyH * 0.80;
+  const neckY = shoulderY - 4;
+  const headR = 15;
+  const headY = neckY - headR - 2;
+  const cx = p.x;
+
+  const moving = Math.abs(p.vx) > 14 && p.onGround;
+  const air = !p.onGround;
+  const swing = moving ? Math.sin(p.runPhase) * 16 : 0;
+  const swing2 = moving ? Math.sin(p.runPhase + Math.PI) * 16 : 0;
+  const reach = Math.max(p.armT, p.reachT);          // 0..1 arm raise
 
   ctx.save();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
 
-  // shadow
-  ctx.fillStyle = 'rgba(0,0,0,.30)';
-  ctx.beginPath(); ctx.ellipse(p.x, FLOOR_Y + 4, PLAYER_W * 0.6, 8, 0, 0, Math.PI * 2); ctx.fill();
+  // ---- ground shadow (shrinks with jump height) ----
+  const airGap = Math.max(0, FLOOR_Y - feetY);
+  const shScale = 1 - Math.min(0.5, airGap / 360);
+  ctx.fillStyle = `rgba(0,0,0,${0.30 * shScale})`;
+  ctx.beginPath(); ctx.ellipse(cx, FLOOR_Y + 5, 26 * shScale, 7 * shScale, 0, 0, Math.PI * 2); ctx.fill();
 
-  // user ring under feet
+  // ---- user ring under feet ----
   if (p.isUser) {
     ctx.strokeStyle = 'rgba(125,255,67,.95)'; ctx.lineWidth = 3.5;
     ctx.setLineDash([7, 6]); ctx.lineDashOffset = (performance.now() / 55) % 13;
-    ctx.beginPath(); ctx.ellipse(p.x, FLOOR_Y + 4, PLAYER_W * 0.66, 10, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(cx, FLOOR_Y + 5, 28, 9, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
   }
 
-  // legs (run cycle when grounded & moving)
-  const moving = Math.abs(p.vx) > 12 && p.onGround;
-  const swing = moving ? Math.sin(p.runPhase) * 14 : 0;
-  ctx.strokeStyle = dark; ctx.lineWidth = 9; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(p.x, hipY); ctx.lineTo(p.x - 8 + swing, feetY); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(p.x, hipY); ctx.lineTo(p.x + 8 - swing, feetY); ctx.stroke();
+  // limb helper: draw a tapered limb via two segments with a joint
+  const limb = (x0: number, y0: number, x1: number, y1: number, x2: number, y2: number, w: number, color: string) => {
+    ctx.strokeStyle = color; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  };
 
-  // torso (jersey)
-  const tg = ctx.createLinearGradient(p.x, shoulderY, p.x, hipY + 6);
+  // ========== BACK LEG (further from camera, drawn first, darker) ==========
+  {
+    const footX = cx + (air ? -f * 8 : swing2 * 0.7);
+    const kneeX = cx + (footX - cx) * 0.5;
+    const kneeY = (hipY + feetY) / 2 + (air ? 10 : 2);
+    limb(cx - 4, hipY, kneeX - 3, kneeY, footX - 3, feetY, 11, skinDark);
+    // back sneaker
+    sneaker(ctx, footX - 3, feetY, f, '#cfd6e0', '#9aa3b2');
+  }
+
+  // ========== BACK ARM ==========
+  {
+    const sx = cx - f * 6, sy = shoulderY + 5;
+    let ex = sx - f * 10, ey = sy + 20, hx = ex - f * 6, hy = ey + 14;
+    if (hasBall && reach < 0.2) { // cradle/dribble: back arm relaxed
+      ex = sx - f * 8; ey = sy + 18; hx = ex - f * 4; hy = ey + 12;
+    } else if (reach > 0.2) {     // raise back arm with shot too
+      ex = sx + f * 4; ey = sy - 10 - reach * 16; hx = ex + f * 12; hy = ey - reach * 22;
+    }
+    limb(sx, sy, ex, ey, hx, hy, 8, skinDark);
+    ctx.fillStyle = skinDark; dot(ctx, hx, hy, 4.5);
+  }
+
+  // ========== LEGS / SHORTS base ==========
+  // front leg
+  const frontFootX = cx + (air ? f * 12 : swing * 0.7);
+  {
+    const kneeX = cx + (frontFootX - cx) * 0.5 + f * 2;
+    const kneeY = (hipY + feetY) / 2 + (air ? 6 : 0);
+    limb(cx + 4, hipY, kneeX + 3, kneeY, frontFootX + 3, feetY, 12, skin);
+    sneaker(ctx, frontFootX + 3, feetY, f, '#ffffff', '#c7ced9');
+  }
+
+  // ---- shorts (over hips) ----
+  const shortsTop = hipY - 6, shortsH = 26;
+  ctx.fillStyle = dark;
+  roundRect(ctx, cx - 17, shortsTop, 34, shortsH, 7); ctx.fill();
+  // shorts stripe
+  ctx.fillStyle = trim;
+  ctx.fillRect(cx - 17, shortsTop + shortsH - 7, 34, 3);
+  // split for legs
+  ctx.fillStyle = 'rgba(0,0,0,.18)';
+  ctx.fillRect(cx - 1.5, shortsTop + 12, 3, shortsH - 12);
+
+  // ========== TORSO (jersey, tapered) ==========
+  const torsoTop = shoulderY, torsoBot = hipY - 2;
+  const tg = ctx.createLinearGradient(cx, torsoTop, cx, torsoBot);
   tg.addColorStop(0, col); tg.addColorStop(1, dark);
   ctx.fillStyle = tg;
-  roundRect(ctx, p.x - PLAYER_W / 2 + 4, shoulderY, PLAYER_W - 8, hipY - shoulderY + 10, 9); ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2;
-  roundRect(ctx, p.x - PLAYER_W / 2 + 4, shoulderY, PLAYER_W - 8, hipY - shoulderY + 10, 9); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - 18, torsoTop + 4);
+  ctx.quadraticCurveTo(cx - 21, torsoTop + 1, cx - 14, torsoTop - 1);   // shoulder
+  ctx.lineTo(cx + 14, torsoTop - 1);
+  ctx.quadraticCurveTo(cx + 21, torsoTop + 1, cx + 18, torsoTop + 4);
+  ctx.lineTo(cx + 15, torsoBot);
+  ctx.quadraticCurveTo(cx, torsoBot + 5, cx - 15, torsoBot);
+  ctx.closePath(); ctx.fill();
+  // side shading
+  ctx.fillStyle = 'rgba(0,0,0,.12)';
+  ctx.beginPath(); ctx.moveTo(cx + 15 * f, torsoTop); ctx.lineTo(cx + 18 * f, torsoTop + 4);
+  ctx.lineTo(cx + 15 * f, torsoBot); ctx.lineTo(cx + 9 * f, torsoBot); ctx.closePath(); ctx.fill();
+  // jersey collar
+  ctx.strokeStyle = trim; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(cx, torsoTop, 7, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  // jersey number
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.font = '900 16px Segoe UI, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(p.id % 10 || 1), cx - f * 2, (torsoTop + torsoBot) / 2);
 
-  // arms — raise toward shot when armT>0, else reach when reachT>0
-  ctx.strokeStyle = col; ctx.lineWidth = 8; ctx.lineCap = 'round';
-  const reach = Math.max(p.armT, p.reachT);
-  const ax = p.x + p.faceDir * (PLAYER_W * 0.32);
-  const armElbowY = shoulderY + 16 - reach * 22;
-  const handX = ax + p.faceDir * (10 + reach * 18);
-  const handY = armElbowY - reach * 26;
-  ctx.beginPath(); ctx.moveTo(p.x + p.faceDir * 6, shoulderY + 6); ctx.lineTo(ax, armElbowY); ctx.lineTo(handX, handY); ctx.stroke();
-  // back arm
-  ctx.strokeStyle = dark;
-  ctx.beginPath(); ctx.moveTo(p.x - p.faceDir * 6, shoulderY + 6); ctx.lineTo(p.x - p.faceDir * 12, shoulderY + 24); ctx.stroke();
+  // ========== FRONT ARM (shooting / dribbling / reaching) ==========
+  {
+    const sx = cx + f * 8, sy = shoulderY + 5;
+    let ex: number, ey: number, hx: number, hy: number;
+    if (reach > 0.05) {
+      // raise to shoot / contest
+      ex = sx + f * (8 - reach * 2); ey = sy - reach * 20;
+      hx = ex + f * (10 + reach * 16); hy = ey - reach * 30;
+    } else if (hasBall) {
+      // dribble: hand bobs near hip, ball is drawn by drawBall syncing roughly
+      const bob = Math.sin(performance.now() / 120) * 5;
+      ex = sx + f * 12; ey = sy + 16; hx = ex + f * 10; hy = ey + 18 + bob;
+    } else {
+      // running arm pump
+      ex = sx + f * 6; ey = sy + 16 + swing * 0.4; hx = ex + f * 8; hy = ey + 14 - swing * 0.3;
+    }
+    limb(sx, sy, ex, ey, hx, hy, 8.5, skin);
+    ctx.fillStyle = skin; dot(ctx, hx, hy, 5);
+  }
+
+  // ========== NECK + HEAD ==========
+  ctx.strokeStyle = skinDark; ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.moveTo(cx, shoulderY - 1); ctx.lineTo(cx, neckY); ctx.stroke();
 
   // head
-  ctx.fillStyle = '#ffe2c2';
-  ctx.beginPath(); ctx.arc(p.x, headY, headR, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 1.5; ctx.stroke();
-  // emoji face
-  ctx.font = '20px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(p.emoji, p.x, headY + 1);
-
-  // headband (team color)
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(cx + f * 2, headY, headR, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.14)'; ctx.lineWidth = 1.4; ctx.stroke();
+  // hair / cap (team color) over the back-top
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.arc(cx + f * 2, headY, headR + 1, Math.PI * 0.85, Math.PI * 1.95); ctx.fill();
+  // headband
   ctx.strokeStyle = col; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.arc(p.x, headY, headR - 1, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx + f * 2, headY, headR - 1, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+  // face: eye + brow looking toward faceDir
+  ctx.fillStyle = '#1a1a1a';
+  dot(ctx, cx + f * (headR - 6), headY - 2, 2.2);
+  // little smile
+  ctx.strokeStyle = 'rgba(40,20,10,.6)'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(cx + f * (headR - 9), headY + 5, 4, Math.PI * 0.1, Math.PI * 0.7); ctx.stroke();
 
-  // name tag
-  ctx.font = '700 13px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+  // ========== name tag ==========
+  ctx.font = '700 12px Segoe UI, sans-serif'; ctx.textAlign = 'center';
   const label = p.name.length > 12 ? p.name.slice(0, 11) + '…' : p.name;
   const tw = ctx.measureText(label).width + 16;
-  const tagY = headY - headR - 20;
-  ctx.fillStyle = hasBall ? 'rgba(255,140,30,.92)' : 'rgba(12,18,34,.7)';
-  roundRect(ctx, p.x - tw / 2, tagY, tw, 18, 9); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, p.x, tagY + 9);
-  // ball-carrier marker
+  const tagY = headY - headR - 18;
+  ctx.fillStyle = hasBall ? 'rgba(255,140,30,.95)' : 'rgba(12,18,34,.66)';
+  roundRect(ctx, cx - tw / 2, tagY, tw, 17, 8); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, cx, tagY + 9);
   if (hasBall) {
     ctx.fillStyle = '#ff7a1a';
-    ctx.beginPath(); ctx.moveTo(p.x, tagY + 26); ctx.lineTo(p.x - 6, tagY + 19); ctx.lineTo(p.x + 6, tagY + 19); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx, tagY + 24); ctx.lineTo(cx - 5, tagY + 18); ctx.lineTo(cx + 5, tagY + 18); ctx.closePath(); ctx.fill();
   }
 
   ctx.restore();
 }
 
+function dot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+}
+
+function sneaker(ctx: CanvasRenderingContext2D, x: number, y: number, f: number, top: string, sole: string) {
+  ctx.save();
+  // shoe body pointing in facing dir
+  ctx.fillStyle = top;
+  ctx.beginPath();
+  ctx.moveTo(x - f * 5, y - 7);
+  ctx.lineTo(x + f * 11, y - 4);
+  ctx.quadraticCurveTo(x + f * 14, y - 1, x + f * 12, y + 2);
+  ctx.lineTo(x - f * 6, y + 2);
+  ctx.closePath(); ctx.fill();
+  // sole
+  ctx.fillStyle = sole;
+  ctx.beginPath();
+  ctx.moveTo(x - f * 6, y + 1); ctx.lineTo(x + f * 12, y + 1);
+  ctx.quadraticCurveTo(x + f * 14, y + 2, x + f * 12, y + 4);
+  ctx.lineTo(x - f * 6, y + 4); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+
 export function drawBall(ctx: CanvasRenderingContext2D, b: Ball, holder: Player | null) {
   let bx = b.x, by = b.y;
   if (holder) {
-    bx = holder.x + holder.faceDir * (PLAYER_W * 0.42);
-    by = holder.y - PLAYER_H * (0.5 - holder.armT * 0.42);
+    const f = holder.faceDir;
+    const reach = Math.max(holder.armT, 0);
+    if (reach > 0.05) {
+      // ball up at the shooting hand
+      const sy = holder.y - PLAYER_H * 0.80 + 5;
+      bx = holder.x + f * (18 + reach * 18);
+      by = sy - reach * 52 - 6;
+    } else {
+      // low dribble near the front hand, bouncing
+      const bob = Math.abs(Math.sin(performance.now() / 120)) * 22;
+      bx = holder.x + f * (PLAYER_W * 0.5);
+      by = FLOOR_Y - BALL_R - bob;
+    }
   }
   ctx.save();
   // shadow on floor
