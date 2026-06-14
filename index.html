@@ -33,7 +33,12 @@
                 <button class="seg-btn" data-min="7">7 MIN</button>
               </div>
             </div>
-            <button id="play-btn" class="play-btn">▶ PLAY</button>
+            <button id="play-btn" class="play-btn">▶ PLAY <span class="btn-sub">vs CPU</span></button>
+            <div class="menu-row">
+              <span class="lbl">YOUR NAME</span>
+              <input id="name-input" class="name-input" maxlength="14" placeholder="Baller" />
+            </div>
+            <button id="online-btn" class="online-btn">🌐 PLAY ONLINE <span class="btn-sub">3v3 real-time</span></button>
           </div>
 
           <div class="controls-hint">
@@ -42,6 +47,20 @@
             <div><b>Hold Space</b> Charge shot</div><div><b>Release</b> Shoot</div>
           </div>
           <p class="credit">BP · BasketPump Arena</p>
+        </div>
+
+        <!-- ONLINE LOBBY -->
+        <div id="lobby" class="lobby">
+          <div class="lobby-card">
+            <div class="lobby-head">
+              <h2>🌐 LIVE ARENAS</h2>
+              <span id="net-dot" class="net-dot">○ connecting…</span>
+              <button id="lobby-close" class="lobby-close">✕</button>
+            </div>
+            <p class="lobby-sub">Jump into a real-time 3v3. Empty spots are filled by AI ballers.</p>
+            <div id="rooms-list" class="rooms-list"></div>
+            <button id="quickplay-btn" class="play-btn quickplay">⚡ QUICK PLAY <span class="btn-sub">auto-join</span></button>
+          </div>
         </div>
       </section>
 

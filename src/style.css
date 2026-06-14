@@ -34,6 +34,37 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .play-btn{margin-top:2px;padding:14px;border:0;border-radius:11px;background:linear-gradient(180deg,var(--green-glow),var(--green-2));color:#06210a;font-weight:900;font-size:17px;letter-spacing:1px;cursor:pointer;box-shadow:0 8px 24px rgba(86,196,43,.45);transition:.15s}
 .play-btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(86,196,43,.6)}
 .play-btn:active{transform:translateY(0)}
+.btn-sub{display:block;font-size:10px;font-weight:700;letter-spacing:1px;opacity:.7;margin-top:1px}
+.name-input{width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--border);background:var(--ink-2);color:var(--white);font-weight:700;font-family:var(--font);font-size:13px}
+.name-input:focus{outline:none;border-color:var(--green)}
+.online-btn{margin-top:2px;padding:12px;border:1px solid var(--green);border-radius:11px;background:linear-gradient(180deg,rgba(86,196,43,.18),rgba(86,196,43,.06));color:var(--green-glow);font-weight:900;font-size:15px;letter-spacing:1px;cursor:pointer;font-family:var(--font);transition:.15s}
+.online-btn:hover{background:linear-gradient(180deg,rgba(86,196,43,.3),rgba(86,196,43,.12));transform:translateY(-2px)}
+/* ===== LOBBY ===== */
+.lobby{position:absolute;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(5,8,4,.82);backdrop-filter:blur(8px)}
+.lobby.open{display:flex}
+.lobby-card{width:min(94vw,520px);background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:18px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.lobby-head{display:flex;align-items:center;gap:10px}
+.lobby-head h2{font-size:19px;font-weight:900;letter-spacing:1px;color:var(--white);flex:1}
+.net-dot{font-size:11px;font-weight:800;letter-spacing:1px;color:var(--muted)}
+.net-dot.on{color:var(--green-glow)}
+.lobby-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:15px;cursor:pointer}
+.lobby-close:hover{color:var(--white);border-color:var(--green)}
+.lobby-sub{font-size:12px;color:var(--muted);margin:8px 0 14px}
+.rooms-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.room-card{display:flex;flex-direction:column;gap:7px;text-align:left;padding:13px 15px;border-radius:12px;border:1px solid var(--border);background:var(--ink-2);color:var(--white);cursor:pointer;font-family:var(--font);transition:.15s}
+.room-card:hover{border-color:var(--green);transform:translateX(3px);box-shadow:0 6px 20px rgba(86,196,43,.2)}
+.room-card.full{opacity:.5;cursor:not-allowed}
+.room-card.full:hover{transform:none;border-color:var(--border);box-shadow:none}
+.room-top{display:flex;align-items:center;justify-content:space-between}
+.room-name{font-weight:900;font-size:15px;letter-spacing:1px}
+.room-status{font-size:10px;font-weight:800;letter-spacing:1px;padding:2px 8px;border-radius:20px;background:rgba(143,163,134,.2);color:var(--muted)}
+.room-status.playing{background:rgba(226,59,59,.2);color:#ff6a6a}
+.room-status.waiting{background:rgba(86,196,43,.2);color:var(--green-glow)}
+.room-mid{font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--white)}
+.room-bot{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.room-players{color:var(--muted);font-weight:700}
+.room-join{color:var(--green-glow);font-weight:900;letter-spacing:1px}
+.quickplay{width:100%}
 .controls-hint{display:grid;grid-template-columns:1fr 1fr;gap:5px 18px;font-size:11.5px;color:var(--muted);width:100%;padding:4px 6px;text-align:left}
 .controls-hint b{color:var(--green-glow);font-weight:800}
 .credit{font-size:10px;color:#4a5640;letter-spacing:3px;font-weight:700}
