@@ -32,7 +32,31 @@ function ensureNet(): Net {
   net.onRooms = (r) => renderRooms(r);
   net.onJoinError = (m) => showToast(m || 'Could not join');
   net.onAssigned = () => { startOnlineMatch(); };
+  net.onState = (s) => onSnapshot(s); // fires once per server snapshot (discrete events)
   return net;
+}
+
+// Discrete per-snapshot handling: score, timer, one-shot fx, toasts, sounds.
+// Runs exactly ONCE per received snapshot (not per render frame) so particle
+// bursts and sounds fire a single time instead of repeating for ~50ms.
+function onSnapshot(s: RoomState) {
+  if (mode !== 'online') return;
+  scoreHomeEl.textContent = String(s.scoreHome);
+  scoreAwayEl.textContent = String(s.scoreAway);
+  setTimer(s.timeLeft);
+  for (const fx of s.fx) {
+    if (fx.kind === 'dunk') {
+      spawnBurst(fx.x, fx.y, ['#7dff43', '#bfff58', '#ffd23b', '#fff'], 22, 60);
+      spawnRing(fx.x, fx.y); clientShake = 14; Audio.play('dunk');
+    } else {
+      const cols = fx.team === 'home' ? ['#7dff43', '#bfff58', '#5cd02e', '#fff'] : ['#ec4040', '#ffd0d0', '#ff7a1a', '#fff'];
+      spawnBurst(fx.x, fx.y + 30, cols, 26, 120); spawnRing(fx.x, fx.y);
+      clientShake = Math.max(clientShake, 8); Audio.play('swish');
+    }
+  }
+  if (s.toast && s.toast !== lastToast) { showToast(s.toast); lastToast = s.toast; }
+  if (!s.toast) lastToast = '';
+  if (s.status === 'ended') ballTagEl.classList.remove('show');
 }
 
 function renderRooms(rooms: RoomSummary[]) {
@@ -168,6 +192,7 @@ function startOnlineMatch() {
   gameoverEl.classList.add('hidden'); lobbyEl.classList.remove('open'); resize();
   Audio.resumeAudio(); Audio.startCrowd();
   charging = false; charge = 0; clientParticles.length = 0;
+  if (import.meta.env.DEV) (window as any).__net = net;
   showToast('Joined ' + (net?.assigned?.code || ''));
   startLoop();
 }
@@ -236,23 +261,14 @@ function updateOnline(dt: number) {
   net.sendInput(p);
   edgeJump = edgeGrab = edgePass = false; pendingShoot = 0;
 
+  // ball-tag / hint reflect the newest raw state (cheap, no interpolation needed).
+  // Score, timer, fx, toasts and sounds are handled once-per-snapshot in onSnapshot().
   const s = net.state;
   if (s) {
-    scoreHomeEl.textContent = String(s.scoreHome);
-    scoreAwayEl.textContent = String(s.scoreAway);
-    setTimer(s.timeLeft);
     const me = mySlot(s);
     staminaFill.style.width = '100%';
     if (me && s.ball.owner === me.id) { ballTagEl.classList.add('show'); hintEl.textContent = charging ? '⚡ Release to SHOOT' : 'Hold SPACE/Click to charge • Q pass'; }
     else { ballTagEl.classList.remove('show'); hintEl.textContent = 'E / Right-click to GRAB • W jump'; }
-    // consume fx events into client particles + shake + sound
-    for (const fx of s.fx) {
-      if (fx.kind === 'dunk') { spawnBurst(fx.x, fx.y, ['#7dff43', '#bfff58', '#ffd23b', '#fff'], 22, 60); spawnRing(fx.x, fx.y); clientShake = 14; Audio.play('dunk'); }
-      else { const cols = fx.team === 'home' ? ['#7dff43', '#bfff58', '#5cd02e', '#fff'] : ['#ec4040', '#ffd0d0', '#ff7a1a', '#fff']; spawnBurst(fx.x, fx.y + 30, cols, 26, 120); spawnRing(fx.x, fx.y); clientShake = Math.max(clientShake, 8); Audio.play('swish'); }
-    }
-    if (s.toast && s.toast !== lastToast) { showToast(s.toast); lastToast = s.toast; }
-    if (!s.toast) lastToast = '';
-    if (s.status === 'ended') { ballTagEl.classList.remove('show'); }
   }
   updateClientParticles(dt);
   if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) toastEl.classList.remove('show'); }
@@ -260,7 +276,7 @@ function updateOnline(dt: number) {
 }
 
 function renderOnline(_dt: number) {
-  const s = net?.state;
+  const s = net?.sample(); // smoothly interpolated render state (~100ms behind, extrapolated if late)
   beginFrame(clientShake);
   drawBackground(ctx);
   if (s) {

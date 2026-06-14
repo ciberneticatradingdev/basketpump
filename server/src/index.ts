@@ -7,7 +7,7 @@ import type { InputPayload, RoomSummary } from './protocol';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 const TICK_HZ = 30;
-const SNAP_HZ = 20;
+const SNAP_HZ = 30; // broadcast every tick — denser packets → smoother client interpolation
 
 const app = express();
 app.use(cors());
