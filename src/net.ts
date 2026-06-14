@@ -28,10 +28,10 @@ export interface Assigned { code: string; slotId: number; team: Team; }
 
 const SERVER_URL = (import.meta.env.VITE_SERVER_URL as string) || 'http://localhost:3001';
 
-// Render ~100ms in the past so we always have two snapshots to interpolate
-// between (server broadcasts at 20Hz = one every 50ms). Extrapolate up to
+// Render ~70ms in the past so we always have two snapshots to interpolate
+// between (server broadcasts at 30Hz = one every ~33ms). Extrapolate up to
 // 120ms forward if packets are late so motion never freezes.
-const INTERP_DELAY = 100;
+const INTERP_DELAY = 70;
 const MAX_EXTRAP = 0.12;
 const BUFFER_MAX = 40;
 

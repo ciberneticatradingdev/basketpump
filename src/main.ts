@@ -2,7 +2,7 @@ import './style.css';
 import { Engine, type UserInput } from './engine';
 import {
   drawBackground, drawHoops, drawPlayer, drawBall, drawChargeRail, drawParticles,
-  WORLD_W, WORLD_H,
+  WORLD_W, WORLD_H, PLAYER_W, PLAYER_H, FLOOR_Y, WALL,
 } from './court';
 import type { MatchConfig, Team, Player, Particle } from './types';
 import * as Audio from './audio';
@@ -41,6 +41,9 @@ function ensureNet(): Net {
 // bursts and sounds fire a single time instead of repeating for ~50ms.
 function onSnapshot(s: RoomState) {
   if (mode !== 'online') return;
+  // reconcile predicted self against authority
+  const me = mySlot(s);
+  if (me) reconcileSelf(me);
   scoreHomeEl.textContent = String(s.scoreHome);
   scoreAwayEl.textContent = String(s.scoreAway);
   setTimer(s.timeLeft);
@@ -192,7 +195,8 @@ function startOnlineMatch() {
   gameoverEl.classList.add('hidden'); lobbyEl.classList.remove('open'); resize();
   Audio.resumeAudio(); Audio.startCrowd();
   charging = false; charge = 0; clientParticles.length = 0;
-  if (import.meta.env.DEV) (window as any).__net = net;
+  self.init = false; // fresh prediction state for this match
+  if (import.meta.env.DEV) { (window as any).__net = net; (window as any).__self = self; }
   showToast('Joined ' + (net?.assigned?.code || ''));
   startLoop();
 }
@@ -249,6 +253,51 @@ const clientParticles: Particle[] = [];
 let clientShake = 0;
 let lastToast = '';
 
+// ===== client-side prediction (own player only) =====
+// Mirrors the authoritative movement physics in server/src/room.ts so the local
+// player reacts to input on the SAME frame (0ms feel) instead of waiting a full
+// network round-trip. Remote players + ball stay interpolated via net.sample().
+const PRED = { GRAV: 2100, MOVE: 430, AIR_MOVE: 300, JUMP_V: 880, FRICTION: 0.82 };
+interface SelfPred { x: number; y: number; vx: number; vy: number; onGround: boolean; faceDir: 1 | -1; armT: number; init: boolean; }
+const self: SelfPred = { x: 0, y: 0, vx: 0, vy: 0, onGround: true, faceDir: 1, armT: 0, init: false };
+
+function predictSelf(dt: number, inp: { left: boolean; right: boolean; jump: boolean }, stunned: boolean) {
+  if (!self.init) return;
+  if (!stunned) {
+    const accel = self.onGround ? PRED.MOVE : PRED.AIR_MOVE;
+    if (inp.left) { self.vx = -accel; self.faceDir = -1; }
+    else if (inp.right) { self.vx = accel; self.faceDir = 1; }
+    else if (self.onGround) self.vx *= PRED.FRICTION;
+    if (inp.jump && self.onGround) { self.vy = -PRED.JUMP_V; self.onGround = false; }
+  } else if (self.onGround) self.vx *= PRED.FRICTION;
+  if (!self.onGround) self.vy += PRED.GRAV * dt;
+  self.x += self.vx * dt; self.y += self.vy * dt;
+  const minX = WALL + PLAYER_W / 2, maxX = WORLD_W - WALL - PLAYER_W / 2;
+  if (self.x < minX) { self.x = minX; self.vx = 0; }
+  if (self.x > maxX) { self.x = maxX; self.vx = 0; }
+  if (self.y >= FLOOR_Y) { self.y = FLOOR_Y; self.vy = 0; self.onGround = true; } else self.onGround = false;
+  self.armT = Math.max(0, self.armT - dt * 3);
+}
+
+// Soft reconciliation against the authoritative snapshot. Tiny steady-state error
+// (we're ahead of the server by ~latency) is blended out invisibly; big divergence
+// (steal, score reset, teleport) snaps hard so we never desync.
+function reconcileSelf(sp: NetPlayer) {
+  if (!self.init) {
+    self.x = sp.x; self.y = sp.y; self.vx = sp.vx; self.vy = sp.vy;
+    self.onGround = sp.onGround; self.faceDir = sp.faceDir; self.armT = sp.armT; self.init = true;
+    return;
+  }
+  const ex = sp.x - self.x, ey = sp.y - self.y;
+  if (Math.hypot(ex, ey) > 140) {            // hard divergence → snap to authority
+    self.x = sp.x; self.y = sp.y; self.vx = sp.vx; self.vy = sp.vy; self.onGround = sp.onGround;
+  } else {                                    // gentle positional blend, keep predicted velocity
+    self.x += ex * 0.18;
+    self.y += ey * 0.30;
+  }
+  self.armT = sp.armT;                        // arm pose is server-driven (shoot/dunk)
+}
+
 function updateOnline(dt: number) {
   if (!net) return;
   if (charging) charge = Math.min(1, charge + dt * 0.85);
@@ -260,6 +309,10 @@ function updateOnline(dt: number) {
   };
   net.sendInput(p);
   edgeJump = edgeGrab = edgePass = false; pendingShoot = 0;
+
+  // predict own player locally so movement feels instant (0ms), independent of ping
+  const stunned = !!(net.state && mySlot(net.state) && (mySlot(net.state)!.stunT > 0));
+  predictSelf(dt, { left: p.left, right: p.right, jump: p.jump }, stunned);
 
   // ball-tag / hint reflect the newest raw state (cheap, no interpolation needed).
   // Score, timer, fx, toasts and sounds are handled once-per-snapshot in onSnapshot().
@@ -282,9 +335,23 @@ function renderOnline(_dt: number) {
   if (s) {
     drawHoops(ctx, { home: s.flashHome, away: s.flashAway });
     const me = mySlot(s);
-    const ordered = [...s.players].sort((a, b) => a.y - b.y);
-    for (const np of ordered) drawPlayer(ctx, netToPlayer(np, me?.id), np.hasBall);
-    drawBall(ctx, { ...s.ball } as any, holderOf(s));
+    const myId = me?.id;
+    // Override the interpolated copy of MY player with the locally-predicted state
+    // so my own movement shows zero input lag. Remote players stay interpolated.
+    const players = s.players.map(np => {
+      if (self.init && np.id === myId) {
+        return { ...np, x: self.x, y: self.y, vx: self.vx, vy: self.vy, onGround: self.onGround, faceDir: self.faceDir, armT: Math.max(np.armT, self.armT) };
+      }
+      return np;
+    });
+    const ordered = [...players].sort((a, b) => a.y - b.y);
+    for (const np of ordered) drawPlayer(ctx, netToPlayer(np, myId), np.hasBall);
+    // ball: if I'm holding it, anchor to my predicted hand so it doesn't lag behind me
+    let ball = { ...s.ball } as any;
+    if (self.init && myId != null && s.ball.owner === myId) {
+      ball = { ...ball, x: self.x + self.faceDir * (PLAYER_W * 0.42), y: self.y - PLAYER_H * (0.5 - self.armT * 0.42) };
+    }
+    drawBall(ctx, ball, holderOf(s));
     drawParticles(ctx, clientParticles);
     if (charging && me && s.ball.owner === me.id) drawChargeRail(ctx, charge);
   } else {
