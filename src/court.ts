@@ -127,13 +127,11 @@ function drawHoop(ctx: CanvasRenderingContext2D, side: 'left' | 'right', _flash:
   ctx.fillStyle = padg;
   roundRect(ctx, poleX - 11, padY, 22, 120, 8); ctx.fill();
 
-  // ---- backboard (clear gray glass) ----
+  // ---- backboard (solid gray) ----
   const bbW = 16, bbH = 116;
   const bbX = side === 'left' ? poleX + 4 : poleX - 4 - bbW;
   const bbY = RIM_Y - 70;
-  const bbg = ctx.createLinearGradient(bbX, bbY, bbX + bbW, bbY + bbH);
-  bbg.addColorStop(0, 'rgba(190,196,204,.55)'); bbg.addColorStop(1, 'rgba(120,126,134,.55)');
-  ctx.fillStyle = bbg;
+  ctx.fillStyle = '#9aa0a8';
   roundRect(ctx, bbX, bbY, bbW, bbH, 5); ctx.fill();
   // frame (gray)
   ctx.strokeStyle = 'rgba(60,66,72,.85)';
