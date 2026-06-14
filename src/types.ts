@@ -26,6 +26,14 @@ export interface Player {
   stunT: number;            // knocked/stunned timer
   pumpT: number;            // squash for jump anticipation
   runPhase: number;         // leg cycle
+  dunkT: number;            // 0..1 dunk slam animation
+}
+
+export interface Particle {
+  x: number; y: number; vx: number; vy: number;
+  life: number; maxLife: number;
+  size: number; color: string;
+  grav: number; kind: 'spark' | 'ring' | 'star' | 'dust';
 }
 
 export interface Ball {

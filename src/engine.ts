@@ -1,4 +1,4 @@
-import type { Player, Ball, Team, MatchConfig, Stats } from './types';
+import type { Player, Ball, Team, MatchConfig, Stats, Particle } from './types';
 import {
   WORLD_W, FLOOR_Y, WALL, PLAYER_W, PLAYER_H, BALL_R,
   targetRim, RIM_R, RIM_Y, POLE_X_L, POLE_X_R, RIM_REACH,
@@ -38,6 +38,8 @@ export class Engine {
   timeLeft: number;
   running = false;
   flash = { home: 0, away: 0 };          // rim score flashes
+  particles: Particle[] = [];            // visual FX
+  shake = 0;                             // screen-shake intensity
   private hooks: EngineHooks;
   private possessionTeam: Team = 'home';
   private resetT = 0;                      // freeze timer after a score
@@ -66,7 +68,7 @@ export class Engine {
         x: baseX + spread, y: FLOOR_Y, vx: 0, vy: 0, onGround: true,
         faceDir: homeSide ? 1 : -1, isUser: false, role: idx === 2 ? 'big' : 'guard',
         stats: mkStats(id * 7 + idx), stamina: 100,
-        armT: 0, reachT: 0, stunT: 0, pumpT: 0, runPhase: Math.random() * 6,
+        armT: 0, reachT: 0, stunT: 0, pumpT: 0, runPhase: Math.random() * 6, dunkT: 0,
       };
     };
     for (let i = 0; i < 3; i++) this.players.push(make('home', i, HOME_NAMES));
@@ -177,6 +179,41 @@ export class Engine {
     this.ball.grabLock = 0.12;
   }
 
+  // ---------- particles ----------
+  private burst(x: number, y: number, opts: { n: number; colors: string[]; speed: number; kind?: Particle['kind']; spread?: number; up?: number; size?: number; grav?: number; life?: number }) {
+    const { n, colors, speed, kind = 'spark', spread = Math.PI * 2, up = 0, size = 4, grav = 1400, life = 0.6 } = opts;
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * spread;
+      const v = speed * (0.5 + Math.random());
+      this.particles.push({
+        x, y,
+        vx: Math.cos(a) * v, vy: Math.sin(a) * v - up,
+        life: life * (0.7 + Math.random() * 0.6), maxLife: life,
+        size: size * (0.6 + Math.random() * 0.8),
+        color: colors[(Math.random() * colors.length) | 0],
+        grav, kind,
+      });
+    }
+  }
+
+  private ring(x: number, y: number, color: string, size = 30) {
+    this.particles.push({ x, y, vx: 0, vy: 0, life: 0.45, maxLife: 0.45, size, color, grav: 0, kind: 'ring' });
+  }
+
+  private updateParticles(dt: number) {
+    const arr = this.particles;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const p = arr[i];
+      p.life -= dt;
+      if (p.life <= 0) { arr.splice(i, 1); continue; }
+      p.vy += p.grav * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.kind !== 'ring' && p.y > FLOOR_Y) { p.y = FLOOR_Y; p.vy *= -0.4; p.vx *= 0.7; }
+    }
+    if (arr.length > 400) arr.splice(0, arr.length - 400);
+    this.shake = Math.max(0, this.shake - dt * 60);
+  }
+
   // ---------- main step ----------
   step(dt: number, input: UserInput, charging: boolean) {
     if (!this.running) return;
@@ -210,12 +247,25 @@ export class Engine {
 
     // integrate all players
     for (const p of this.players) {
+      const wasAir = !p.onGround;
+      const fallV = p.vy;
       this.integratePlayer(p, dt);
+      // landing dust when a fast fall hits the floor
+      if (wasAir && p.onGround && fallV > 520) {
+        this.burst(p.x, FLOOR_Y + 2, { n: 8, colors: ['rgba(220,220,210,.9)', 'rgba(180,180,170,.7)'], speed: 140, kind: 'dust', spread: Math.PI, up: 30, size: 5, grav: 600, life: 0.4 });
+      }
       // arm/reach decay
       p.armT = Math.max(0, p.armT - dt * 3);
       p.reachT = Math.max(0, p.reachT - dt * 4);
+      p.dunkT = Math.max(0, p.dunkT - dt * 2.2);
       if (Math.abs(p.vx) > 12 && p.onGround) p.runPhase += dt * 16; else p.runPhase = 0;
     }
+
+    // try dunk: ball-carrier high up & close to their rim → slam it
+    this.tryDunk();
+
+    // particles + screenshake
+    this.updateParticles(dt);
 
     // ball physics
     this.integrateBall(dt);
@@ -303,10 +353,44 @@ export class Engine {
     }
   }
 
+  // dunk: ball-carrier airborne and very close to their own rim → auto-slam
+  private tryDunk() {
+    if (this.resetT > 0) return;
+    const h = this.holder();
+    if (!h || h.onGround) return;
+    const rim = targetRim(h.team);
+    const nearX = Math.abs(h.x - rim.x) < 56;
+    const highEnough = (h.y - PLAYER_H * 0.55) < rim.y + 30;   // hands reach rim level
+    const rising = h.vy < 120;
+    if (nearX && highEnough && rising) {
+      // SLAM
+      h.dunkT = 1; h.armT = 1;
+      this.ball.owner = null; this.ball.inFlight = true;
+      this.ball.x = rim.x; this.ball.y = rim.y - 6;
+      this.ball.vx = 0; this.ball.vy = 240;        // drive it straight down
+      this.ball.lastShooter = h.id; this.ball.lastShotTeam = h.team;
+      this.ball.scoreLock = 0; this.ball.grabLock = 0.3;
+      this.hooks.onSound('dunk');
+      this.hooks.onToast(h.isUser ? 'SLAM DUNK! 🔥' : 'DUNK!');
+      this.shake = 14;
+      // explosion of sparks at the rim
+      this.burst(rim.x, rim.y, { n: 22, colors: ['#7dff43', '#bfff58', '#ffd23b', '#ffffff'], speed: 360, up: 60, size: 5, life: 0.7 });
+      this.ring(rim.x, rim.y, '#7dff43', 22);
+    }
+  }
+
   private score(team: Team) {
     if (team === 'home') { this.scoreHome += 2; this.flash.home = 0.8; }
     else { this.scoreAway += 2; this.flash.away = 0.8; }
     this.hooks.onSound('swish');
+    // confetti + ring burst at the scoring rim
+    const rim = targetRim(team);
+    const teamCols = team === 'home'
+      ? ['#7dff43', '#bfff58', '#5cd02e', '#ffffff']
+      : ['#ec4040', '#ffd0d0', '#ff7a1a', '#ffffff'];
+    this.burst(rim.x, rim.y + 30, { n: 26, colors: teamCols, speed: 300, up: 120, size: 5, life: 0.9, grav: 1200 });
+    this.ring(rim.x, rim.y, '#7dff43', 18);
+    this.shake = Math.max(this.shake, 8);
     this.hooks.onToast(team === 'home' ? 'BUCKET! +2 🟢' : 'AWAY SCORES +2');
     this.hooks.onScore(team);
     this.resetT = 1.4;

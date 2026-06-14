@@ -21,7 +21,7 @@ function noise(dur: number, gain = 0.2, hp = 800) {
   src.connect(f); f.connect(g); g.connect(a.destination); src.start(t);
 }
 
-export type Sfx = 'shoot' | 'swish' | 'rim' | 'pass' | 'steal' | 'dribble' | 'whistle';
+export type Sfx = 'shoot' | 'swish' | 'rim' | 'pass' | 'steal' | 'dribble' | 'whistle' | 'dunk';
 
 let muted = false;
 export function setMuted(m: boolean) { muted = m; }
@@ -38,6 +38,7 @@ export function play(s: Sfx) {
       case 'steal': noise(0.1, 0.16, 1500); tone(520, 0.08, 'sawtooth', 0.1); break;
       case 'dribble': tone(140, 0.07, 'sine', 0.16, 90); break;
       case 'whistle': tone(1800, 0.14, 'sine', 0.12); break;
+      case 'dunk': noise(0.3, 0.22, 600); tone(90, 0.28, 'square', 0.2, 50); tone(200, 0.12, 'sawtooth', 0.12); break;
     }
   } catch {}
 }

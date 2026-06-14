@@ -1,7 +1,7 @@
 import './style.css';
 import { Engine, type UserInput } from './engine';
 import {
-  drawBackground, drawHoops, drawPlayer, drawBall, drawChargeRail,
+  drawBackground, drawHoops, drawPlayer, drawBall, drawChargeRail, drawParticles,
   WORLD_W, WORLD_H,
 } from './court';
 import type { MatchConfig, Team } from './types';
@@ -167,7 +167,11 @@ function render() {
   if (!engine) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.setTransform(scale, 0, 0, scale, offX, offY);
+  // screen shake on dunks / big scores
+  const sh = engine.shake;
+  const shx = sh > 0 ? (Math.random() - 0.5) * sh * scale : 0;
+  const shy = sh > 0 ? (Math.random() - 0.5) * sh * scale : 0;
+  ctx.setTransform(scale, 0, 0, scale, offX + shx, offY + shy);
 
   drawBackground(ctx);
   drawHoops(ctx, engine.flash);
@@ -177,6 +181,9 @@ function render() {
   const ordered = [...engine.players].sort((p, q) => p.y - q.y);
   for (const p of ordered) drawPlayer(ctx, p, engine.ball.owner === p.id);
   drawBall(ctx, engine.ball, holder);
+
+  // particle FX on top of action
+  drawParticles(ctx, engine.particles);
 
   // charge rail (left side) while charging a shot with ball
   if (charging && engine.userHasBall()) drawChargeRail(ctx, charge);

@@ -1,4 +1,4 @@
-import type { Player, Ball, Team } from './types';
+import type { Player, Ball, Team, Particle } from './types';
 
 // ===== Side-view world =====
 // Origin top-left. Gravity pulls +y. Home attacks the RIGHT hoop, Away the LEFT hoop.
@@ -109,52 +109,83 @@ function drawHoop(ctx: CanvasRenderingContext2D, side: 'left' | 'right', flash: 
   const poleX = side === 'left' ? POLE_X_L : POLE_X_R;
   const inward = side === 'left' ? 1 : -1;
   const rimX = poleX + inward * RIM_REACH;
+  const scored = flash > 0;
 
   ctx.save();
-  // pole
-  const pg = ctx.createLinearGradient(poleX - 7, 0, poleX + 7, 0);
-  pg.addColorStop(0, '#c9d4e6'); pg.addColorStop(0.5, '#eef3fb'); pg.addColorStop(1, '#aeb9cc');
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+  // ---- pole (green-tinted chrome, BasketPump palette) ----
+  const pg = ctx.createLinearGradient(poleX - 8, 0, poleX + 8, 0);
+  pg.addColorStop(0, '#16331a'); pg.addColorStop(0.5, '#dff7d2'); pg.addColorStop(1, '#2c5a26');
   ctx.fillStyle = pg;
-  roundRect(ctx, poleX - 6, RIM_Y - 40, 12, FLOOR_Y - (RIM_Y - 40), 6); ctx.fill();
+  roundRect(ctx, poleX - 7, RIM_Y - 30, 14, FLOOR_Y - (RIM_Y - 30), 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1.5;
+  roundRect(ctx, poleX - 7, RIM_Y - 30, 14, FLOOR_Y - (RIM_Y - 30), 7); ctx.stroke();
+  // pole pad with BP
+  const padY = RIM_Y + 120;
+  ctx.fillStyle = '#0e1a0c';
+  roundRect(ctx, poleX - 11, padY, 22, 120, 8); ctx.fill();
+  ctx.fillStyle = '#7dff43'; ctx.font = '900 13px Segoe UI, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.save(); ctx.translate(poleX, padY + 60); ctx.fillText('BP', 0, 0); ctx.restore();
 
-  // backboard
-  ctx.fillStyle = 'rgba(255,255,255,.92)';
-  const bbX = poleX + inward * 6;
-  ctx.save(); ctx.globalAlpha = .9;
-  roundRect(ctx, side === 'left' ? bbX : bbX - 14, RIM_Y - 64, 14, 110, 4); ctx.fill();
-  ctx.restore();
-  ctx.strokeStyle = 'rgba(40,60,110,.5)'; ctx.lineWidth = 2;
-  roundRect(ctx, side === 'left' ? bbX : bbX - 14, RIM_Y - 64, 14, 110, 4); ctx.stroke();
-  // square target
-  ctx.strokeStyle = '#e23b3b'; ctx.lineWidth = 3;
-  ctx.strokeRect(side === 'left' ? bbX + 3 : bbX - 11, RIM_Y - 26, 8, 26);
+  // ---- backboard (dark green branded glass) ----
+  const bbW = 16, bbH = 116;
+  const bbX = side === 'left' ? poleX + 4 : poleX - 4 - bbW;
+  const bbY = RIM_Y - 70;
+  const bbg = ctx.createLinearGradient(bbX, bbY, bbX + bbW, bbY + bbH);
+  bbg.addColorStop(0, 'rgba(18,40,16,.94)'); bbg.addColorStop(1, 'rgba(10,24,9,.94)');
+  ctx.fillStyle = bbg;
+  roundRect(ctx, bbX, bbY, bbW, bbH, 5); ctx.fill();
+  // glow frame (green, brightens on score)
+  ctx.strokeStyle = scored ? '#7dff43' : 'rgba(125,255,67,.7)';
+  ctx.lineWidth = scored ? 4 : 2.5;
+  if (scored) { ctx.shadowColor = '#7dff43'; ctx.shadowBlur = 20; }
+  roundRect(ctx, bbX, bbY, bbW, bbH, 5); ctx.stroke();
+  ctx.shadowBlur = 0;
+  // shooter's square (white, target on the inward face)
+  const sqX = side === 'left' ? bbX + bbW - 9 : bbX + 1;
+  ctx.strokeStyle = 'rgba(244,248,240,.95)'; ctx.lineWidth = 2.5;
+  ctx.strokeRect(sqX, RIM_Y - 24, 8, 24);
+  // BP mark on the board
+  ctx.fillStyle = 'rgba(125,255,67,.85)'; ctx.font = '900 11px Segoe UI, sans-serif';
+  ctx.save(); ctx.translate(bbX + bbW / 2, bbY + 16); ctx.fillText('BP', 0, 0); ctx.restore();
 
-  // rim arm
-  ctx.strokeStyle = '#ff7a1a'; ctx.lineWidth = 7; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(bbX, RIM_Y); ctx.lineTo(rimX, RIM_Y); ctx.stroke();
+  // ---- rim arm + hanger ----
+  ctx.strokeStyle = '#ff6a12'; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(side === 'left' ? bbX + bbW : bbX, RIM_Y); ctx.lineTo(rimX, RIM_Y); ctx.stroke();
 
-  // rim (ellipse opening, seen at slight angle)
-  const rimGlow = flash > 0;
-  ctx.strokeStyle = rimGlow ? '#7dff43' : '#ff7a1a';
-  ctx.lineWidth = rimGlow ? 8 : 6;
-  if (rimGlow) { ctx.shadowColor = '#7dff43'; ctx.shadowBlur = 22; }
-  ctx.beginPath();
-  ctx.ellipse(rimX, RIM_Y, RIM_R, 7, 0, 0, Math.PI * 2); ctx.stroke();
+  // ---- net (drawn behind the rim front edge) ----
+  const netH = 46 + (scored ? Math.sin(flash * 26) * 5 : 0);
+  ctx.strokeStyle = scored ? 'rgba(125,255,67,.85)' : 'rgba(255,255,255,.72)';
+  ctx.lineWidth = 1.5;
+  const strands = 7;
+  for (let i = 0; i <= strands; i++) {
+    const tX = rimX - RIM_R + (i / strands) * (RIM_R * 2);
+    const bX = rimX - RIM_R * 0.42 + (i / strands) * (RIM_R * 0.84);
+    ctx.beginPath(); ctx.moveTo(tX, RIM_Y + 5); ctx.lineTo(bX, RIM_Y + netH); ctx.stroke();
+  }
+  // braided cross rings
+  for (let r = 1; r <= 4; r++) {
+    const yy = RIM_Y + 5 + (netH / 4) * r;
+    const wRatio = 1 - r * 0.14;
+    ctx.beginPath();
+    ctx.moveTo(rimX - RIM_R * wRatio, yy);
+    ctx.quadraticCurveTo(rimX, yy + 4, rimX + RIM_R * wRatio, yy);
+    ctx.stroke();
+  }
+
+  // ---- rim (chunky orange torus, green glow on score) ----
+  ctx.strokeStyle = scored ? '#7dff43' : '#ff7a1a';
+  ctx.lineWidth = scored ? 9 : 7;
+  if (scored) { ctx.shadowColor = '#7dff43'; ctx.shadowBlur = 24; }
+  ctx.beginPath(); ctx.ellipse(rimX, RIM_Y, RIM_R, 8, 0, 0, Math.PI * 2); ctx.stroke();
+  // front-edge highlight
+  ctx.strokeStyle = scored ? 'rgba(190,255,150,.9)' : 'rgba(255,180,90,.9)';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(rimX, RIM_Y + 1, RIM_R - 1, 7, 0, Math.PI * 0.08, Math.PI * 0.92); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // net
-  ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.4;
-  const netH = 40 + (flash > 0 ? Math.sin(flash * 24) * 4 : 0);
-  for (let i = -3; i <= 3; i++) {
-    const topx = rimX + (i / 3) * RIM_R;
-    const botx = rimX + (i / 3) * (RIM_R * 0.45);
-    ctx.beginPath(); ctx.moveTo(topx, RIM_Y + 4); ctx.lineTo(botx, RIM_Y + netH); ctx.stroke();
-  }
-  for (let r = 1; r <= 3; r++) {
-    const yy = RIM_Y + (netH / 3) * r;
-    const wRatio = 1 - r * 0.18;
-    ctx.beginPath(); ctx.moveTo(rimX - RIM_R * wRatio, yy); ctx.lineTo(rimX + RIM_R * wRatio, yy); ctx.stroke();
-  }
   ctx.restore();
 }
 
@@ -273,16 +304,21 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, hasBall: bo
   ctx.font = '900 16px Segoe UI, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(String(p.id % 10 || 1), cx - f * 2, (torsoTop + torsoBot) / 2);
 
-  // ========== FRONT ARM (shooting / dribbling / reaching) ==========
+  // ========== FRONT ARM (shooting / dunking / dribbling / reaching) ==========
   {
     const sx = cx + f * 8, sy = shoulderY + 5;
     let ex: number, ey: number, hx: number, hy: number;
-    if (reach > 0.05) {
+    if (p.dunkT > 0.05) {
+      // big overhead slam: arm fully extended up toward the rim
+      const d = p.dunkT;
+      ex = sx + f * (10 + d * 4); ey = sy - 24 * d;
+      hx = ex + f * (12 + d * 10); hy = ey - 40 * d;
+    } else if (reach > 0.05) {
       // raise to shoot / contest
       ex = sx + f * (8 - reach * 2); ey = sy - reach * 20;
       hx = ex + f * (10 + reach * 16); hy = ey - reach * 30;
     } else if (hasBall) {
-      // dribble: hand bobs near hip, ball is drawn by drawBall syncing roughly
+      // dribble: hand bobs near hip
       const bob = Math.sin(performance.now() / 120) * 5;
       ex = sx + f * 12; ey = sy + 16; hx = ex + f * 10; hy = ey + 18 + bob;
     } else {
@@ -387,6 +423,30 @@ export function drawBall(ctx: CanvasRenderingContext2D, b: Ball, holder: Player 
   ctx.moveTo(0, -BALL_R); ctx.lineTo(0, BALL_R);
   ctx.arc(0, -BALL_R * 1.6, BALL_R * 1.4, Math.PI * 0.32, Math.PI * 0.68);
   ctx.stroke();
+  ctx.restore();
+}
+
+// particle FX (sparks, confetti, dust, expanding rings)
+export function drawParticles(ctx: CanvasRenderingContext2D, particles: Particle[]) {
+  ctx.save();
+  for (const p of particles) {
+    const t = Math.max(0, p.life / p.maxLife);
+    if (p.kind === 'ring') {
+      const r = p.size + (1 - t) * 70;
+      ctx.globalAlpha = t * 0.8;
+      ctx.strokeStyle = p.color; ctx.lineWidth = 3 * t + 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+    } else if (p.kind === 'star') {
+      ctx.globalAlpha = t;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * t, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.globalAlpha = Math.min(1, t * 1.3);
+      ctx.fillStyle = p.color;
+      const s = p.size * (0.5 + t * 0.5);
+      ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+    }
+  }
   ctx.restore();
 }
 
