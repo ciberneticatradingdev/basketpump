@@ -1,0 +1,69 @@
+:root{
+  --green:#56c42b; --green-2:#3d9e1a; --green-glow:#7dff43;
+  --ink:#0a0e0a; --ink-2:#11160f; --panel:#161c12; --panel-2:#1c2417;
+  --white:#f4f8f0; --muted:#8fa386; --border:#2c3a22;
+  --home:#56c42b; --away:#e23b3b;
+  --radius:14px;
+  --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(--font);overflow:hidden;-webkit-user-select:none;user-select:none}
+#app{position:fixed;inset:0}
+.screen{position:absolute;inset:0;display:none}
+.screen.active{display:block}
+
+/* ===== MENU ===== */
+#menu-screen.active{display:flex;align-items:center;justify-content:center}
+.menu-bg{position:absolute;inset:0;background:
+  radial-gradient(circle at 20% 15%, rgba(86,196,43,.22), transparent 45%),
+  radial-gradient(circle at 85% 85%, rgba(86,196,43,.15), transparent 50%),
+  linear-gradient(160deg,#0c1109,#070a06);}
+.menu-bg::after{content:"";position:absolute;inset:0;opacity:.06;
+  background-image:repeating-linear-gradient(45deg,#fff 0 2px,transparent 2px 22px);}
+.menu-inner{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:10px;width:min(92vw,440px);padding:24px 0;text-align:center}
+.menu-logo{width:min(74vw,300px);border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.6),0 0 0 1px var(--border);}
+.tagline{font-weight:800;letter-spacing:2px;font-size:15px;color:var(--white);margin-top:-2px}
+.tagline .g{color:var(--green-glow);text-shadow:0 0 18px rgba(125,255,67,.5)}
+.menu-card{width:100%;background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:14px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.menu-row{display:flex;flex-direction:column;gap:7px;text-align:left}
+.lbl{font-size:11px;letter-spacing:2px;color:var(--muted);font-weight:700}
+.seg{display:flex;gap:6px;background:var(--ink-2);padding:5px;border-radius:11px;border:1px solid var(--border)}
+.seg-btn{flex:1;padding:9px 6px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-weight:700;font-size:12px;cursor:pointer;transition:.15s;font-family:var(--font)}
+.seg-btn:hover{color:var(--white)}
+.seg-btn.active{background:linear-gradient(180deg,var(--green),var(--green-2));color:#06210a;box-shadow:0 4px 14px rgba(86,196,43,.4)}
+.play-btn{margin-top:2px;padding:14px;border:0;border-radius:11px;background:linear-gradient(180deg,var(--green-glow),var(--green-2));color:#06210a;font-weight:900;font-size:17px;letter-spacing:1px;cursor:pointer;box-shadow:0 8px 24px rgba(86,196,43,.45);transition:.15s}
+.play-btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(86,196,43,.6)}
+.play-btn:active{transform:translateY(0)}
+.controls-hint{display:grid;grid-template-columns:1fr 1fr;gap:5px 18px;font-size:11.5px;color:var(--muted);width:100%;padding:4px 6px;text-align:left}
+.controls-hint b{color:var(--green-glow);font-weight:800}
+.credit{font-size:10px;color:#4a5640;letter-spacing:3px;font-weight:700}
+
+/* ===== GAME ===== */
+#court{position:absolute;inset:0;width:100%;height:100%;display:block;background:#0a1207;touch-action:none}
+#hud{position:absolute;inset:0;pointer-events:none;z-index:5}
+.scorebar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;background:rgba(10,14,9,.82);border:1px solid var(--border);backdrop-filter:blur(8px);border-radius:14px;padding:8px 16px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+.team{display:flex;align-items:center;gap:7px;font-weight:800;font-size:12px;letter-spacing:1px;color:var(--muted)}
+.team .dot{width:10px;height:10px;border-radius:50%}
+.team-home .dot{background:var(--home);box-shadow:0 0 10px var(--home)}
+.team-away .dot{background:var(--away);box-shadow:0 0 10px var(--away)}
+.scoreblock{display:flex;align-items:center;gap:8px;font-weight:900;font-size:30px;font-variant-numeric:tabular-nums;line-height:1}
+#score-home{color:var(--home)}#score-away{color:var(--away)}.scoreblock .sep{color:var(--muted);font-size:22px}
+.timer{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);font-weight:800;font-size:15px;color:var(--white);background:rgba(10,14,9,.82);border:1px solid var(--border);padding:3px 14px;border-radius:10px;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.stamina-wrap{position:absolute;left:16px;bottom:18px;width:min(38vw,220px)}
+.stamina-lbl{font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:700;margin-bottom:4px}
+.stamina-bar{height:10px;background:rgba(10,14,9,.8);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+#stamina-fill{height:100%;width:100%;background:linear-gradient(90deg,var(--green-2),var(--green-glow));transition:width .1s linear}
+#toast{position:absolute;top:38%;left:50%;transform:translateX(-50%);font-weight:900;font-size:clamp(26px,7vw,56px);letter-spacing:2px;color:var(--green-glow);text-shadow:0 4px 24px rgba(0,0,0,.7),0 0 30px rgba(125,255,67,.5);opacity:0;transition:opacity .25s;text-align:center;white-space:nowrap}
+#toast.show{opacity:1}
+#quit-btn{position:absolute;top:14px;right:14px;z-index:6;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:rgba(10,14,9,.82);color:var(--muted);font-size:16px;cursor:pointer;backdrop-filter:blur(8px)}
+#quit-btn:hover{color:var(--white);border-color:var(--green)}
+.overlay{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;background:rgba(5,8,4,.78);backdrop-filter:blur(6px)}
+.overlay.hidden{display:none}
+.go-card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:18px;padding:28px 34px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;box-shadow:0 20px 60px rgba(0,0,0,.6);width:min(90vw,360px)}
+#go-title{font-size:24px;letter-spacing:2px;font-weight:900}
+.go-score{font-size:46px;font-weight:900;font-variant-numeric:tabular-nums}
+#go-sub{color:var(--muted);font-weight:700;font-size:13px;letter-spacing:1px}
+.ghost-btn{padding:11px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--muted);font-weight:800;cursor:pointer;width:100%;font-family:var(--font)}
+.ghost-btn:hover{color:var(--white);border-color:var(--green)}
+.go-card .play-btn{width:100%}
+@media(max-width:520px){.controls-hint{grid-template-columns:1fr}}

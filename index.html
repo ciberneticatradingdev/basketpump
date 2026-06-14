@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/jpeg" href="/brand/logo.jpg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0a0e0a" />
+    <title>BasketPump — Play Hard. Pump High.</title>
+    <meta name="description" content="BasketPump — fast arcade 3v3 street basketball. Play Hard. Pump High." />
+  </head>
+  <body>
+    <div id="app">
+      <!-- MENU -->
+      <section id="menu-screen" class="screen active">
+        <div class="menu-bg"></div>
+        <div class="menu-inner">
+          <img class="menu-logo" src="/brand/logo.jpg" alt="BasketPump" />
+          <p class="tagline">PLAY HARD. <span class="g">PUMP HIGH.</span></p>
+
+          <div class="menu-card">
+            <div class="menu-row">
+              <span class="lbl">MODE</span>
+              <div class="seg" id="seg-mode">
+                <button class="seg-btn active" data-mode="quick">Quick Match</button>
+                <button class="seg-btn" data-mode="ranked">Ranked</button>
+                <button class="seg-btn" data-mode="practice">Practice</button>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="lbl">MATCH LENGTH</span>
+              <div class="seg" id="seg-time">
+                <button class="seg-btn" data-min="3">3 MIN</button>
+                <button class="seg-btn active" data-min="5">5 MIN</button>
+                <button class="seg-btn" data-min="7">7 MIN</button>
+              </div>
+            </div>
+            <button id="play-btn" class="play-btn">▶ PLAY</button>
+          </div>
+
+          <div class="controls-hint">
+            <div><b>WASD</b> Move</div><div><b>Shift</b> Sprint</div>
+            <div><b>Left Click</b> Pass (hold = power)</div><div><b>Right Click</b> Shoot (hold = meter)</div>
+            <div><b>Space</b> Crossover</div><div><b>Double-tap</b> Dash</div>
+          </div>
+          <p class="credit">BP · BasketPump Arcade</p>
+        </div>
+      </section>
+
+      <!-- GAME -->
+      <section id="game-screen" class="screen">
+        <canvas id="court"></canvas>
+        <div id="hud">
+          <div class="scorebar">
+            <div class="team team-home"><span class="dot"></span>BP HOME</div>
+            <div class="scoreblock"><span id="score-home">0</span><span class="sep">:</span><span id="score-away">0</span></div>
+            <div class="team team-away">AWAY<span class="dot"></span></div>
+            <div class="timer" id="timer">5:00</div>
+          </div>
+          <div class="stamina-wrap"><div class="stamina-lbl">STAMINA</div><div class="stamina-bar"><div id="stamina-fill"></div></div></div>
+          <div id="toast"></div>
+        </div>
+        <div id="gameover" class="overlay hidden">
+          <div class="go-card">
+            <h2 id="go-title">MATCH OVER</h2>
+            <div class="go-score"><span id="go-home">0</span> : <span id="go-away">0</span></div>
+            <p id="go-sub"></p>
+            <button id="go-rematch" class="play-btn">REMATCH</button>
+            <button id="go-menu" class="ghost-btn">MENU</button>
+          </div>
+        </div>
+        <button id="quit-btn" title="Quit">✕</button>
+      </section>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
