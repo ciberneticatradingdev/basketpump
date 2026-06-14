@@ -24,53 +24,59 @@ export const targetRim = (t: Team) => t === 'home'
   : { x: POLE_X_L + RIM_REACH, y: RIM_Y };  // away shoots at left hoop
 
 let bgCache: HTMLCanvasElement | null = null;
+let courtImg: HTMLImageElement | null = null;
+let courtReady = false;
+
+// load the real court photo for the game background
+(() => {
+  const img = new Image();
+  img.onload = () => { courtReady = true; bgCache = null; /* rebuild with photo */ };
+  img.src = '/brand/court.jpg';
+  courtImg = img;
+})();
 
 function buildBackground(): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = WORLD_W; c.height = WORLD_H;
   const x = c.getContext('2d')!;
 
-  // night-sky court gradient (matches the reference: deep blue arena)
+  if (courtReady && courtImg) {
+    // cover-fit the photo into the world rect
+    const iw = courtImg.naturalWidth, ih = courtImg.naturalHeight;
+    const s = Math.max(WORLD_W / iw, WORLD_H / ih);
+    const dw = iw * s, dh = ih * s;
+    x.drawImage(courtImg, (WORLD_W - dw) / 2, (WORLD_H - dh) / 2, dw, dh);
+    // darken slightly toward the bottom so players + ball pop and the gameplay band reads clearly
+    const shade = x.createLinearGradient(0, 0, 0, WORLD_H);
+    shade.addColorStop(0, 'rgba(6,10,20,.28)');
+    shade.addColorStop(0.55, 'rgba(6,10,20,.18)');
+    shade.addColorStop(0.78, 'rgba(4,7,14,.42)');
+    shade.addColorStop(1, 'rgba(3,5,10,.66)');
+    x.fillStyle = shade; x.fillRect(0, 0, WORLD_W, WORLD_H);
+    // soft green ground-line glow where players stand
+    radialGlow(x, WORLD_W / 2, FLOOR_Y, 520, 'rgba(86,196,43,.10)');
+    return c;
+  }
+
+  // ---- fallback procedural arena (used until the photo loads) ----
+  // night-sky court gradient
   const sky = x.createLinearGradient(0, 0, 0, FLOOR_Y);
   sky.addColorStop(0, '#0c1430');
   sky.addColorStop(0.55, '#13357a');
   sky.addColorStop(1, '#1d57b0');
   roundRect(x, 0, 0, WORLD_W, WORLD_H, 0); x.fillStyle = sky; x.fill();
 
-  // subtle green spotlight glows (BasketPump branding)
   radialGlow(x, WORLD_W * 0.22, 120, 360, 'rgba(86,196,43,.16)');
   radialGlow(x, WORLD_W * 0.8, 80, 420, 'rgba(86,196,43,.12)');
 
-  // faint crowd dots up top
-  x.save();
-  for (let i = 0; i < 240; i++) {
-    const px = Math.random() * WORLD_W, py = 20 + Math.random() * 150;
-    x.globalAlpha = 0.05 + Math.random() * 0.12;
-    x.fillStyle = Math.random() > 0.7 ? '#7dff43' : '#bcd0ff';
-    x.beginPath(); x.arc(px, py, 1.5 + Math.random() * 1.6, 0, Math.PI * 2); x.fill();
-  }
-  x.restore();
-
-  // wooden floor
   const floorH = WORLD_H - FLOOR_Y;
   const wood = x.createLinearGradient(0, FLOOR_Y, 0, WORLD_H);
   wood.addColorStop(0, '#b07a3e');
   wood.addColorStop(0.08, '#9c6a34');
   wood.addColorStop(1, '#7c5226');
   x.fillStyle = wood; x.fillRect(0, FLOOR_Y, WORLD_W, floorH);
-  // planks
-  x.save(); x.globalAlpha = .18; x.strokeStyle = '#5e3d1a'; x.lineWidth = 2;
-  for (let i = 0; i < WORLD_W; i += 46) { x.beginPath(); x.moveTo(i, FLOOR_Y); x.lineTo(i, WORLD_H); x.stroke(); }
-  x.restore();
-  // floor highlight line
   x.strokeStyle = 'rgba(255,255,255,.65)'; x.lineWidth = 3;
   x.beginPath(); x.moveTo(0, FLOOR_Y); x.lineTo(WORLD_W, FLOOR_Y); x.stroke();
-
-  // center logo on floor
-  x.save(); x.translate(WORLD_W / 2, FLOOR_Y + floorH / 2);
-  x.globalAlpha = .14; x.fillStyle = '#3d2510';
-  x.font = '900 46px Segoe UI, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText('BASKETPUMP', 0, 0); x.restore();
 
   return c;
 }
