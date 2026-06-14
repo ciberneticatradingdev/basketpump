@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#0a0e0a" />
     <title>BasketPump — Play Hard. Pump High.</title>
-    <meta name="description" content="BasketPump — fast arcade 3v3 street basketball. Play Hard. Pump High." />
+    <meta name="description" content="BasketPump — fast arcade basketball brawler. Two hoops, team vs team. Play Hard. Pump High." />
   </head>
   <body>
     <div id="app">
@@ -38,11 +38,11 @@
           </div>
 
           <div class="controls-hint">
-            <div><b>WASD</b> Move</div><div><b>Shift</b> Sprint</div>
-            <div><b>Left Click</b> Pass (hold = power)</div><div><b>Right Click</b> Shoot (hold = meter)</div>
-            <div><b>Space</b> Crossover</div><div><b>Double-tap</b> Dash</div>
+            <div><b>A / D</b> Move</div><div><b>W</b> Jump</div>
+            <div><b>E</b> Grab / Steal</div><div><b>Q</b> Pass</div>
+            <div><b>Hold Space</b> Charge shot</div><div><b>Release</b> Shoot</div>
           </div>
-          <p class="credit">BP · BasketPump Arcade</p>
+          <p class="credit">BP · BasketPump Arena</p>
         </div>
       </section>
 
@@ -51,13 +51,20 @@
         <canvas id="court"></canvas>
         <div id="hud">
           <div class="scorebar">
-            <div class="team team-home"><span class="dot"></span>BP HOME</div>
+            <div class="team team-home"><span class="dot"></span>HOME</div>
             <div class="scoreblock"><span id="score-home">0</span><span class="sep">:</span><span id="score-away">0</span></div>
             <div class="team team-away">AWAY<span class="dot"></span></div>
             <div class="timer" id="timer">5:00</div>
           </div>
+          <div id="ball-tag">YOU HAVE THE BALL</div>
           <div class="stamina-wrap"><div class="stamina-lbl">STAMINA</div><div class="stamina-bar"><div id="stamina-fill"></div></div></div>
+          <div id="action-hint" class="action-hint"></div>
           <div id="toast"></div>
+        </div>
+        <div class="keycaps">
+          <span><b>A&nbsp;/&nbsp;D</b> move</span><span><b>W</b> jump</span>
+          <span><b>E</b> grab</span><span><b>Q</b> pass</span>
+          <span class="hot"><b>Hold&nbsp;/&nbsp;Space</b></span><span>charge&nbsp;&amp;&nbsp;shoot</span>
         </div>
         <div id="gameover" class="overlay hidden">
           <div class="go-card">

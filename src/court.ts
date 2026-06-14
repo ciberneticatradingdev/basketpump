@@ -1,192 +1,273 @@
 import type { Player, Ball, Team } from './types';
 
-// World dimensions (full mini-court, horizontal). Home attacks RIGHT, Away attacks LEFT.
-export const COURT_W = 1500;
-export const COURT_H = 900;
-export const MARGIN = 70;
-export const HOOP_R = 26;          // rim radius (scoring zone)
-export const PLAYER_R = 26;
-export const BALL_R = 12;
+// ===== Side-view world =====
+// Origin top-left. Gravity pulls +y. Home attacks the RIGHT hoop, Away the LEFT hoop.
+export const WORLD_W = 1280;
+export const WORLD_H = 720;
+export const FLOOR_Y = 628;           // ground contact line (player feet)
+export const WALL = 26;               // invisible side walls keep players in
 
-export const hoopFor = (t: Team) => t === 'home'
-  ? { x: COURT_W - MARGIN + 6, y: COURT_H / 2 }   // right
-  : { x: MARGIN - 6, y: COURT_H / 2 };            // left
+export const PLAYER_H = 96;           // body height (feet->head)
+export const PLAYER_W = 46;
+export const BALL_R = 17;
 
-const C = {
-  woodA: '#b9d98f', woodB: '#aed080',
-  line: 'rgba(255,255,255,.82)', paint: 'rgba(86,196,43,.30)',
-  paintLine: 'rgba(255,255,255,.7)', shadow: 'rgba(0,0,0,.28)',
-};
+// Hoops: a pole at each end, rim sticking inward.
+export const RIM_Y = 300;             // rim height
+export const RIM_R = 34;              // rim half-width (scoring gap)
+export const POLE_X_L = 64;           // left pole center x
+export const POLE_X_R = WORLD_W - 64; // right pole center x
+export const RIM_REACH = 92;          // how far the rim extends from the pole into the court
 
-let fieldCache: HTMLCanvasElement | null = null;
+// Rim center (the scoring point) for each team's TARGET hoop.
+export const targetRim = (t: Team) => t === 'home'
+  ? { x: POLE_X_R - RIM_REACH, y: RIM_Y }   // home shoots at right hoop
+  : { x: POLE_X_L + RIM_REACH, y: RIM_Y };  // away shoots at left hoop
 
-function buildField(): HTMLCanvasElement {
+let bgCache: HTMLCanvasElement | null = null;
+
+function buildBackground(): HTMLCanvasElement {
   const c = document.createElement('canvas');
-  c.width = COURT_W; c.height = COURT_H;
+  c.width = WORLD_W; c.height = WORLD_H;
   const x = c.getContext('2d')!;
-  // backdrop (dark surround)
-  x.fillStyle = '#0a1207'; x.fillRect(0, 0, COURT_W, COURT_H);
 
-  // court floor with green paint-splash gradient
-  const fx = MARGIN, fy = MARGIN, fw = COURT_W - MARGIN * 2, fh = COURT_H - MARGIN * 2;
-  const g = x.createLinearGradient(fx, fy, fx, fy + fh);
-  g.addColorStop(0, C.woodA); g.addColorStop(1, C.woodB);
-  roundRect(x, fx, fy, fw, fh, 18); x.fillStyle = g; x.fill();
+  // night-sky court gradient (matches the reference: deep blue arena)
+  const sky = x.createLinearGradient(0, 0, 0, FLOOR_Y);
+  sky.addColorStop(0, '#0c1430');
+  sky.addColorStop(0.55, '#13357a');
+  sky.addColorStop(1, '#1d57b0');
+  roundRect(x, 0, 0, WORLD_W, WORLD_H, 0); x.fillStyle = sky; x.fill();
 
-  // subtle plank streaks
-  x.save(); roundRect(x, fx, fy, fw, fh, 18); x.clip();
-  x.globalAlpha = .05; x.strokeStyle = '#2c4012'; x.lineWidth = 2;
-  for (let i = 0; i < fw; i += 26) { x.beginPath(); x.moveTo(fx + i, fy); x.lineTo(fx + i, fy + fh); x.stroke(); }
-  // green graffiti splashes in corners
-  x.globalAlpha = .16; x.fillStyle = '#3d9e1a';
-  splash(x, fx + 60, fy + 60, 50); splash(x, fx + fw - 70, fy + fh - 70, 60); splash(x, fx + fw - 90, fy + 80, 36);
+  // subtle green spotlight glows (BasketPump branding)
+  radialGlow(x, WORLD_W * 0.22, 120, 360, 'rgba(86,196,43,.16)');
+  radialGlow(x, WORLD_W * 0.8, 80, 420, 'rgba(86,196,43,.12)');
+
+  // faint crowd dots up top
+  x.save();
+  for (let i = 0; i < 240; i++) {
+    const px = Math.random() * WORLD_W, py = 20 + Math.random() * 150;
+    x.globalAlpha = 0.05 + Math.random() * 0.12;
+    x.fillStyle = Math.random() > 0.7 ? '#7dff43' : '#bcd0ff';
+    x.beginPath(); x.arc(px, py, 1.5 + Math.random() * 1.6, 0, Math.PI * 2); x.fill();
+  }
   x.restore();
 
-  // court lines
-  x.strokeStyle = C.line; x.lineWidth = 4;
-  roundRect(x, fx, fy, fw, fh, 18); x.stroke();
-  // halfcourt line
-  const cx = COURT_W / 2, cy = COURT_H / 2;
-  x.beginPath(); x.moveTo(cx, fy); x.lineTo(cx, fy + fh); x.stroke();
-  // center circle
-  x.beginPath(); x.arc(cx, cy, 95, 0, Math.PI * 2); x.stroke();
-  x.save(); x.fillStyle = C.paint; x.beginPath(); x.arc(cx, cy, 95, 0, Math.PI * 2); x.fill(); x.restore();
+  // wooden floor
+  const floorH = WORLD_H - FLOOR_Y;
+  const wood = x.createLinearGradient(0, FLOOR_Y, 0, WORLD_H);
+  wood.addColorStop(0, '#b07a3e');
+  wood.addColorStop(0.08, '#9c6a34');
+  wood.addColorStop(1, '#7c5226');
+  x.fillStyle = wood; x.fillRect(0, FLOOR_Y, WORLD_W, floorH);
+  // planks
+  x.save(); x.globalAlpha = .18; x.strokeStyle = '#5e3d1a'; x.lineWidth = 2;
+  for (let i = 0; i < WORLD_W; i += 46) { x.beginPath(); x.moveTo(i, FLOOR_Y); x.lineTo(i, WORLD_H); x.stroke(); }
+  x.restore();
+  // floor highlight line
+  x.strokeStyle = 'rgba(255,255,255,.65)'; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(0, FLOOR_Y); x.lineTo(WORLD_W, FLOOR_Y); x.stroke();
 
-  // both ends: paint key + arc + hoop
-  drawEnd(x, 'home'); drawEnd(x, 'away');
-
-  // center logo text
-  x.save(); x.translate(cx, cy); x.globalAlpha = .14; x.fillStyle = '#1c3a09';
-  x.font = '900 60px Segoe UI, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText('BP', 0, 0); x.restore();
+  // center logo on floor
+  x.save(); x.translate(WORLD_W / 2, FLOOR_Y + floorH / 2);
+  x.globalAlpha = .14; x.fillStyle = '#3d2510';
+  x.font = '900 46px Segoe UI, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText('BASKETPUMP', 0, 0); x.restore();
 
   return c;
 }
 
-function drawEnd(x: CanvasRenderingContext2D, t: Team) {
-  const h = hoopFor(t);
-  const left = t === 'away';
-  const baseX = left ? MARGIN : COURT_W - MARGIN;
-  const dir = left ? 1 : -1;            // into court
-  const keyW = 220, keyH = 300;
-  const ky = COURT_H / 2 - keyH / 2;
-  const kx = left ? MARGIN : COURT_W - MARGIN - keyW;
-  // painted key
-  x.save(); x.fillStyle = C.paint; roundRect(x, kx, ky, keyW, keyH, 6); x.fill();
-  x.strokeStyle = C.paintLine; x.lineWidth = 3; roundRect(x, kx, ky, keyW, keyH, 6); x.stroke();
-  // free-throw circle
-  x.beginPath(); x.arc(left ? kx + keyW : kx, COURT_H / 2, 70, 0, Math.PI * 2); x.stroke();
-  x.restore();
-  // 3pt arc
-  x.save(); x.strokeStyle = C.line; x.lineWidth = 4;
-  x.beginPath(); x.arc(baseX, COURT_H / 2, 360, left ? -Math.PI / 2.3 : Math.PI / 2.3, left ? Math.PI / 2.3 : -Math.PI / 2.3, left); x.stroke();
-  x.restore();
-  // backboard + rim
-  x.save();
-  x.strokeStyle = '#f4f8f0'; x.lineWidth = 6;
-  x.beginPath(); x.moveTo(baseX, COURT_H / 2 - 46); x.lineTo(baseX, COURT_H / 2 + 46); x.stroke();
-  x.strokeStyle = '#ff7a1a'; x.lineWidth = 5;
-  x.beginPath(); x.arc(h.x, h.y, HOOP_R, 0, Math.PI * 2); x.stroke();
-  // net
-  x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = 1.5;
-  for (let i = -2; i <= 2; i++) { x.beginPath(); x.moveTo(h.x + i * 9, h.y - HOOP_R + 6); x.lineTo(h.x + i * 5, h.y + HOOP_R + 16); x.stroke(); }
-  x.restore();
-  void dir;
-}
-
-function splash(x: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
-  x.beginPath();
-  for (let a = 0; a < Math.PI * 2; a += Math.PI / 7) {
-    const rr = r * (0.55 + Math.random() * 0.7);
-    const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr;
-    a === 0 ? x.moveTo(px, py) : x.lineTo(px, py);
-  }
-  x.closePath(); x.fill();
+function radialGlow(x: CanvasRenderingContext2D, cx: number, cy: number, r: number, color: string) {
+  const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+  g.addColorStop(0, color); g.addColorStop(1, 'transparent');
+  x.fillStyle = g; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
 }
 
 export function roundRect(x: CanvasRenderingContext2D, X: number, Y: number, W: number, H: number, r: number) {
+  r = Math.min(r, W / 2, H / 2);
   x.beginPath();
   x.moveTo(X + r, Y); x.arcTo(X + W, Y, X + W, Y + H, r); x.arcTo(X + W, Y + H, X, Y + H, r);
   x.arcTo(X, Y + H, X, Y, r); x.arcTo(X, Y, X + W, Y, r); x.closePath();
 }
 
-export function drawCourt(ctx: CanvasRenderingContext2D) {
-  if (!fieldCache) fieldCache = buildField();
-  ctx.drawImage(fieldCache, 0, 0);
+export function drawBackground(ctx: CanvasRenderingContext2D) {
+  if (!bgCache) bgCache = buildBackground();
+  ctx.drawImage(bgCache, 0, 0);
 }
 
-export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, hasBall: boolean, isUser: boolean) {
-  const col = p.team === 'home' ? '#56c42b' : '#e23b3b';
-  const dark = p.team === 'home' ? '#2f7a14' : '#8f1f1f';
-  // shadow
+// ===== Hoops (drawn live; rim front net animates on score) =====
+export function drawHoops(ctx: CanvasRenderingContext2D, flash: { home: number; away: number }) {
+  drawHoop(ctx, 'left', flash.away);   // left hoop = away's target
+  drawHoop(ctx, 'right', flash.home);  // right hoop = home's target
+}
+
+function drawHoop(ctx: CanvasRenderingContext2D, side: 'left' | 'right', flash: number) {
+  const poleX = side === 'left' ? POLE_X_L : POLE_X_R;
+  const inward = side === 'left' ? 1 : -1;
+  const rimX = poleX + inward * RIM_REACH;
+
   ctx.save();
-  ctx.fillStyle = C.shadow; ctx.beginPath();
-  ctx.ellipse(p.x, p.y + PLAYER_R * 0.78, PLAYER_R * 0.95, PLAYER_R * 0.42, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
+  // pole
+  const pg = ctx.createLinearGradient(poleX - 7, 0, poleX + 7, 0);
+  pg.addColorStop(0, '#c9d4e6'); pg.addColorStop(0.5, '#eef3fb'); pg.addColorStop(1, '#aeb9cc');
+  ctx.fillStyle = pg;
+  roundRect(ctx, poleX - 6, RIM_Y - 40, 12, FLOOR_Y - (RIM_Y - 40), 6); ctx.fill();
 
-  // user highlight ring
-  if (isUser) {
-    ctx.save();
-    ctx.strokeStyle = 'rgba(125,255,67,.9)'; ctx.lineWidth = 3.5;
-    ctx.setLineDash([6, 6]); ctx.lineDashOffset = (performance.now() / 60) % 12;
-    ctx.beginPath(); ctx.arc(p.x, p.y, PLAYER_R + 8, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-  }
-
-  // body (jersey circle)
-  const g = ctx.createRadialGradient(p.x - 8, p.y - 10, 4, p.x, p.y, PLAYER_R);
-  g.addColorStop(0, col); g.addColorStop(1, dark);
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, PLAYER_R, 0, Math.PI * 2); ctx.fill();
-  ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.stroke();
-
-  // facing chevron
-  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.facing);
+  // backboard
   ctx.fillStyle = 'rgba(255,255,255,.92)';
-  ctx.beginPath(); ctx.moveTo(PLAYER_R - 6, 0); ctx.lineTo(PLAYER_R - 16, -7); ctx.lineTo(PLAYER_R - 16, 7); ctx.closePath(); ctx.fill();
+  const bbX = poleX + inward * 6;
+  ctx.save(); ctx.globalAlpha = .9;
+  roundRect(ctx, side === 'left' ? bbX : bbX - 14, RIM_Y - 64, 14, 110, 4); ctx.fill();
   ctx.restore();
+  ctx.strokeStyle = 'rgba(40,60,110,.5)'; ctx.lineWidth = 2;
+  roundRect(ctx, side === 'left' ? bbX : bbX - 14, RIM_Y - 64, 14, 110, 4); ctx.stroke();
+  // square target
+  ctx.strokeStyle = '#e23b3b'; ctx.lineWidth = 3;
+  ctx.strokeRect(side === 'left' ? bbX + 3 : bbX - 11, RIM_Y - 26, 8, 26);
 
-  // jersey number
-  ctx.fillStyle = '#fff'; ctx.font = '900 18px Segoe UI, sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(String(p.id % 10 || 1), p.x, p.y - 1);
+  // rim arm
+  ctx.strokeStyle = '#ff7a1a'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(bbX, RIM_Y); ctx.lineTo(rimX, RIM_Y); ctx.stroke();
 
-  // ball-carrier glow
-  if (hasBall) {
-    ctx.save(); ctx.strokeStyle = 'rgba(255,180,40,.9)'; ctx.lineWidth = 3;
-    ctx.shadowColor = '#ff9a1a'; ctx.shadowBlur = 14;
-    ctx.beginPath(); ctx.arc(p.x, p.y, PLAYER_R + 3, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  // rim (ellipse opening, seen at slight angle)
+  const rimGlow = flash > 0;
+  ctx.strokeStyle = rimGlow ? '#7dff43' : '#ff7a1a';
+  ctx.lineWidth = rimGlow ? 8 : 6;
+  if (rimGlow) { ctx.shadowColor = '#7dff43'; ctx.shadowBlur = 22; }
+  ctx.beginPath();
+  ctx.ellipse(rimX, RIM_Y, RIM_R, 7, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // net
+  ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.4;
+  const netH = 40 + (flash > 0 ? Math.sin(flash * 24) * 4 : 0);
+  for (let i = -3; i <= 3; i++) {
+    const topx = rimX + (i / 3) * RIM_R;
+    const botx = rimX + (i / 3) * (RIM_R * 0.45);
+    ctx.beginPath(); ctx.moveTo(topx, RIM_Y + 4); ctx.lineTo(botx, RIM_Y + netH); ctx.stroke();
   }
-}
-
-export function drawBall(ctx: CanvasRenderingContext2D, b: Ball) {
-  const zlift = b.z;
-  // shadow on floor scales with height
-  ctx.save();
-  ctx.fillStyle = C.shadow;
-  const s = 1 + zlift / 220;
-  ctx.beginPath(); ctx.ellipse(b.x, b.y + 4, BALL_R * 0.9 * (1 / s) + 2, BALL_R * 0.5 * (1 / s) + 1, 0, 0, Math.PI * 2); ctx.fill();
+  for (let r = 1; r <= 3; r++) {
+    const yy = RIM_Y + (netH / 3) * r;
+    const wRatio = 1 - r * 0.18;
+    ctx.beginPath(); ctx.moveTo(rimX - RIM_R * wRatio, yy); ctx.lineTo(rimX + RIM_R * wRatio, yy); ctx.stroke();
+  }
   ctx.restore();
-
-  const by = b.y - zlift;
-  const g = ctx.createRadialGradient(b.x - 4, by - 4, 2, b.x, by, BALL_R);
-  g.addColorStop(0, '#ff9d3a'); g.addColorStop(1, '#d4641a');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, by, BALL_R, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(20,10,0,.7)'; ctx.lineWidth = 1.4;
-  ctx.beginPath(); ctx.arc(b.x, by, BALL_R, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(b.x - BALL_R, by); ctx.lineTo(b.x + BALL_R, by);
-  ctx.moveTo(b.x, by - BALL_R); ctx.lineTo(b.x, by + BALL_R); ctx.stroke();
 }
 
-// Shot meter drawn above the user player
-export function drawShotMeter(ctx: CanvasRenderingContext2D, p: Player, value: number) {
-  const w = 86, h = 12, gx = p.x - w / 2, gy = p.y - PLAYER_R - 26;
+// ===== Players (cartoon humanoid, side view) =====
+export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, hasBall: boolean) {
+  const col = p.team === 'home' ? '#56c42b' : '#e23b3b';
+  const dark = p.team === 'home' ? '#2f7a14' : '#9c2323';
+  const feetY = p.y;
+  const squash = p.pumpT;                          // 0..1 crouch
+  const bodyH = PLAYER_H * (1 - squash * 0.18);
+  const headR = 17;
+  const hipY = feetY - bodyH * 0.42;
+  const shoulderY = feetY - bodyH * 0.78;
+  const headY = feetY - bodyH + headR * 0.2;
+
   ctx.save();
-  roundRect(ctx, gx, gy, w, h, 6); ctx.fillStyle = 'rgba(8,12,6,.85)'; ctx.fill();
-  // green perfect zone 0.78..0.92
-  const zoneA = gx + w * 0.78, zoneW = w * 0.14;
-  ctx.fillStyle = 'rgba(125,255,67,.85)'; roundRect(ctx, zoneA, gy, zoneW, h, 3); ctx.fill();
-  // fill
-  ctx.fillStyle = '#f4f8f0'; roundRect(ctx, gx + 2, gy + 2, (w - 4) * Math.min(1, value), h - 4, 3); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.5; roundRect(ctx, gx, gy, w, h, 6); ctx.stroke();
+
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,.30)';
+  ctx.beginPath(); ctx.ellipse(p.x, FLOOR_Y + 4, PLAYER_W * 0.6, 8, 0, 0, Math.PI * 2); ctx.fill();
+
+  // user ring under feet
+  if (p.isUser) {
+    ctx.strokeStyle = 'rgba(125,255,67,.95)'; ctx.lineWidth = 3.5;
+    ctx.setLineDash([7, 6]); ctx.lineDashOffset = (performance.now() / 55) % 13;
+    ctx.beginPath(); ctx.ellipse(p.x, FLOOR_Y + 4, PLAYER_W * 0.66, 10, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // legs (run cycle when grounded & moving)
+  const moving = Math.abs(p.vx) > 12 && p.onGround;
+  const swing = moving ? Math.sin(p.runPhase) * 14 : 0;
+  ctx.strokeStyle = dark; ctx.lineWidth = 9; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(p.x, hipY); ctx.lineTo(p.x - 8 + swing, feetY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p.x, hipY); ctx.lineTo(p.x + 8 - swing, feetY); ctx.stroke();
+
+  // torso (jersey)
+  const tg = ctx.createLinearGradient(p.x, shoulderY, p.x, hipY + 6);
+  tg.addColorStop(0, col); tg.addColorStop(1, dark);
+  ctx.fillStyle = tg;
+  roundRect(ctx, p.x - PLAYER_W / 2 + 4, shoulderY, PLAYER_W - 8, hipY - shoulderY + 10, 9); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2;
+  roundRect(ctx, p.x - PLAYER_W / 2 + 4, shoulderY, PLAYER_W - 8, hipY - shoulderY + 10, 9); ctx.stroke();
+
+  // arms — raise toward shot when armT>0, else reach when reachT>0
+  ctx.strokeStyle = col; ctx.lineWidth = 8; ctx.lineCap = 'round';
+  const reach = Math.max(p.armT, p.reachT);
+  const ax = p.x + p.faceDir * (PLAYER_W * 0.32);
+  const armElbowY = shoulderY + 16 - reach * 22;
+  const handX = ax + p.faceDir * (10 + reach * 18);
+  const handY = armElbowY - reach * 26;
+  ctx.beginPath(); ctx.moveTo(p.x + p.faceDir * 6, shoulderY + 6); ctx.lineTo(ax, armElbowY); ctx.lineTo(handX, handY); ctx.stroke();
+  // back arm
+  ctx.strokeStyle = dark;
+  ctx.beginPath(); ctx.moveTo(p.x - p.faceDir * 6, shoulderY + 6); ctx.lineTo(p.x - p.faceDir * 12, shoulderY + 24); ctx.stroke();
+
+  // head
+  ctx.fillStyle = '#ffe2c2';
+  ctx.beginPath(); ctx.arc(p.x, headY, headR, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 1.5; ctx.stroke();
+  // emoji face
+  ctx.font = '20px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(p.emoji, p.x, headY + 1);
+
+  // headband (team color)
+  ctx.strokeStyle = col; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(p.x, headY, headR - 1, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+
+  // name tag
+  ctx.font = '700 13px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+  const label = p.name.length > 12 ? p.name.slice(0, 11) + '…' : p.name;
+  const tw = ctx.measureText(label).width + 16;
+  const tagY = headY - headR - 20;
+  ctx.fillStyle = hasBall ? 'rgba(255,140,30,.92)' : 'rgba(12,18,34,.7)';
+  roundRect(ctx, p.x - tw / 2, tagY, tw, 18, 9); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, p.x, tagY + 9);
+  // ball-carrier marker
+  if (hasBall) {
+    ctx.fillStyle = '#ff7a1a';
+    ctx.beginPath(); ctx.moveTo(p.x, tagY + 26); ctx.lineTo(p.x - 6, tagY + 19); ctx.lineTo(p.x + 6, tagY + 19); ctx.closePath(); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+export function drawBall(ctx: CanvasRenderingContext2D, b: Ball, holder: Player | null) {
+  let bx = b.x, by = b.y;
+  if (holder) {
+    bx = holder.x + holder.faceDir * (PLAYER_W * 0.42);
+    by = holder.y - PLAYER_H * (0.5 - holder.armT * 0.42);
+  }
+  ctx.save();
+  // shadow on floor
+  ctx.fillStyle = 'rgba(0,0,0,.22)';
+  ctx.beginPath(); ctx.ellipse(bx, FLOOR_Y + 4, BALL_R * 0.8, 5, 0, 0, Math.PI * 2); ctx.fill();
+
+  ctx.translate(bx, by); ctx.rotate(b.spin);
+  const g = ctx.createRadialGradient(-5, -5, 3, 0, 0, BALL_R);
+  g.addColorStop(0, '#ffb259'); g.addColorStop(1, '#d4641a');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, BALL_R, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(30,12,0,.75)'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(0, 0, BALL_R, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-BALL_R, 0); ctx.lineTo(BALL_R, 0);
+  ctx.moveTo(0, -BALL_R); ctx.lineTo(0, BALL_R);
+  ctx.arc(0, -BALL_R * 1.6, BALL_R * 1.4, Math.PI * 0.32, Math.PI * 0.68);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// vertical charge meter on the left rail (matches reference red bar)
+export function drawChargeRail(ctx: CanvasRenderingContext2D, value: number) {
+  const x = 30, y = 150, w = 18, h = WORLD_H - 320;
+  ctx.save();
+  roundRect(ctx, x, y, w, h, 9); ctx.fillStyle = 'rgba(8,14,30,.7)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 2; roundRect(ctx, x, y, w, h, 9); ctx.stroke();
+  const fillH = (h - 6) * Math.min(1, value);
+  const grad = ctx.createLinearGradient(0, y + h, 0, y);
+  grad.addColorStop(0, '#56c42b'); grad.addColorStop(0.6, '#ffd23b'); grad.addColorStop(1, '#e23b3b');
+  ctx.fillStyle = grad;
+  roundRect(ctx, x + 3, y + h - 3 - fillH, w - 6, fillH, 6); ctx.fill();
   ctx.restore();
 }

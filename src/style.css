@@ -55,6 +55,17 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 #stamina-fill{height:100%;width:100%;background:linear-gradient(90deg,var(--green-2),var(--green-glow));transition:width .1s linear}
 #toast{position:absolute;top:38%;left:50%;transform:translateX(-50%);font-weight:900;font-size:clamp(26px,7vw,56px);letter-spacing:2px;color:var(--green-glow);text-shadow:0 4px 24px rgba(0,0,0,.7),0 0 30px rgba(125,255,67,.5);opacity:0;transition:opacity .25s;text-align:center;white-space:nowrap}
 #toast.show{opacity:1}
+/* ball possession pill (top-right, like reference) */
+#ball-tag{position:absolute;top:18px;right:18px;background:rgba(244,248,240,.95);color:#0a0e0a;font-weight:800;font-size:12px;letter-spacing:1px;padding:8px 16px;border-radius:20px;box-shadow:0 6px 20px rgba(0,0,0,.4);opacity:0;transform:translateY(-6px);transition:.2s}
+#ball-tag.show{opacity:1;transform:translateY(0)}
+/* contextual action hint (bottom-center bubble) */
+.action-hint{position:absolute;bottom:84px;left:50%;transform:translateX(-50%);background:rgba(10,14,9,.85);border:1px solid var(--border);color:var(--white);font-weight:700;font-size:13px;letter-spacing:.5px;padding:8px 18px;border-radius:12px;backdrop-filter:blur(8px);white-space:nowrap}
+/* keycap legend (very bottom) */
+.keycaps{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:6;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;pointer-events:none}
+.keycaps span{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);background:rgba(10,14,9,.7);border:1px solid var(--border);padding:5px 9px;border-radius:8px}
+.keycaps b{display:inline-block;background:rgba(244,248,240,.12);border:1px solid var(--border);border-radius:6px;padding:2px 6px;color:var(--white);font-weight:800}
+.keycaps .hot b{background:linear-gradient(180deg,var(--green),var(--green-2));color:#06210a;border-color:transparent}
+@media(max-width:680px){.keycaps{display:none}.action-hint{bottom:20px;font-size:12px}}
 #quit-btn{position:absolute;top:14px;right:14px;z-index:6;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:rgba(10,14,9,.82);color:var(--muted);font-size:16px;cursor:pointer;backdrop-filter:blur(8px)}
 #quit-btn:hover{color:var(--white);border-color:var(--green)}
 .overlay{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;background:rgba(5,8,4,.78);backdrop-filter:blur(6px)}
