@@ -16,9 +16,9 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 #menu-screen.active{display:flex;align-items:center;justify-content:center}
 .menu-bg{position:absolute;inset:0;background:#070a06 url('/brand/court.jpg') center/cover no-repeat;}
 .menu-bg::before{content:"";position:absolute;inset:0;background:
-  radial-gradient(circle at 50% 38%, rgba(7,10,6,.35), rgba(7,10,6,.78) 70%),
-  linear-gradient(180deg, rgba(7,10,6,.55), rgba(7,10,6,.88));}
-.menu-bg::after{content:"";position:absolute;inset:0;opacity:.05;
+  radial-gradient(circle at 50% 42%, rgba(7,10,6,.05), rgba(7,10,6,.34) 72%),
+  linear-gradient(180deg, rgba(7,10,6,.12), rgba(7,10,6,.46));}
+.menu-bg::after{content:"";position:absolute;inset:0;opacity:.04;
   background-image:repeating-linear-gradient(45deg,#fff 0 2px,transparent 2px 22px);}
 .menu-inner{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:10px;width:min(92vw,440px);padding:24px 0;text-align:center}
 .menu-logo{width:min(78vw,330px);filter:drop-shadow(0 16px 40px rgba(0,0,0,.7)) drop-shadow(0 0 24px rgba(86,196,43,.25));}

@@ -31,7 +31,7 @@ let courtReady = false;
 (() => {
   const img = new Image();
   img.onload = () => { courtReady = true; bgCache = null; /* rebuild with photo */ };
-  img.src = '/brand/court.jpg';
+  img.src = '/brand/arena.jpg';
   courtImg = img;
 })();
 
@@ -46,15 +46,15 @@ function buildBackground(): HTMLCanvasElement {
     const s = Math.max(WORLD_W / iw, WORLD_H / ih);
     const dw = iw * s, dh = ih * s;
     x.drawImage(courtImg, (WORLD_W - dw) / 2, (WORLD_H - dh) / 2, dw, dh);
-    // darken slightly toward the bottom so players + ball pop and the gameplay band reads clearly
+    // light touch — only a soft bottom shade so players + ball read against the floor; keep the bright daytime look
     const shade = x.createLinearGradient(0, 0, 0, WORLD_H);
-    shade.addColorStop(0, 'rgba(6,10,20,.28)');
-    shade.addColorStop(0.55, 'rgba(6,10,20,.18)');
-    shade.addColorStop(0.78, 'rgba(4,7,14,.42)');
-    shade.addColorStop(1, 'rgba(3,5,10,.66)');
+    shade.addColorStop(0, 'rgba(6,10,20,.04)');
+    shade.addColorStop(0.62, 'rgba(6,10,20,.02)');
+    shade.addColorStop(0.82, 'rgba(8,14,24,.20)');
+    shade.addColorStop(1, 'rgba(6,10,18,.40)');
     x.fillStyle = shade; x.fillRect(0, 0, WORLD_W, WORLD_H);
     // soft green ground-line glow where players stand
-    radialGlow(x, WORLD_W / 2, FLOOR_Y, 520, 'rgba(86,196,43,.10)');
+    radialGlow(x, WORLD_W / 2, FLOOR_Y, 520, 'rgba(86,196,43,.08)');
     return c;
   }
 
