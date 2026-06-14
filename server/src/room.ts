@@ -11,9 +11,6 @@ const targetRim = (t: Team) => t === 'home'
   ? { x: POLE_X_R - RIM_REACH, y: RIM_Y }
   : { x: POLE_X_L + RIM_REACH, y: RIM_Y };
 
-const BOT_HOME = ['ApeDunker', 'GreenMamba', 'PumpKing'];
-const BOT_AWAY = ['RedRocket', 'FadeGod', 'NightOwl'];
-
 interface Input extends InputPayload {}
 const emptyInput = (): Input => ({ left: false, right: false, jump: false, grab: false, pass: false, charging: false, shootPower: 0 });
 
@@ -35,52 +32,68 @@ export class Room {
 
   constructor(code: string) {
     this.code = code;
-    this.spawn();
-    this.giveBallTo(this.players[0]);
+    // No players until humans join. No bots — Quick Match is human-only (min 1v1 to play).
   }
 
-  private spawn() {
-    let id = 1;
-    const mk = (team: Team, idx: number): NetPlayer => {
-      const homeSide = team === 'home';
-      const baseX = homeSide ? WORLD_W * 0.32 : WORLD_W * 0.68;
-      const spread = (idx - 1) * 120 * (homeSide ? 1 : -1);
-      return {
-        id: id++, team, name: (homeSide ? BOT_HOME : BOT_AWAY)[idx], isBot: true, socketId: null,
-        x: baseX + spread, y: FLOOR_Y, vx: 0, vy: 0, faceDir: homeSide ? 1 : -1, onGround: true,
-        armT: 0, reachT: 0, stunT: 0, pumpT: 0, runPhase: Math.random() * 6, dunkT: 0, hasBall: false,
-      };
+  private nextId = 1;
+  private makeHuman(team: Team, name: string, socketId: string): NetPlayer {
+    const homeSide = team === 'home';
+    const baseX = homeSide ? WORLD_W * 0.32 : WORLD_W * 0.68;
+    const idx = this.players.filter(p => p.team === team).length; // 0..2
+    const spread = (idx - 1) * 120 * (homeSide ? 1 : -1);
+    return {
+      id: this.nextId++, team, name, isBot: false, socketId,
+      x: baseX + spread, y: FLOOR_Y, vx: 0, vy: 0, faceDir: homeSide ? 1 : -1, onGround: true,
+      armT: 0, reachT: 0, stunT: 0, pumpT: 0, runPhase: 0, dunkT: 0, hasBall: false,
     };
-    for (let i = 0; i < 3; i++) this.players.push(mk('home', i));
-    for (let i = 0; i < 3; i++) this.players.push(mk('away', i));
   }
 
   // ---- membership ----
-  humanCount() { return this.players.filter(p => !p.isBot).length; }
+  humanCount() { return this.players.length; }   // every player is a human now
   capacity() { return 6; }
-  hasHumans() { return this.humanCount() > 0; }
+  hasHumans() { return this.players.length > 0; }
+  private bothTeamsPresent() {
+    return this.players.some(p => p.team === 'home') && this.players.some(p => p.team === 'away');
+  }
 
   addHuman(socketId: string, name: string): NetPlayer | null {
-    // prefer balancing teams; fill a bot slot
-    const homeH = this.players.filter(p => p.team === 'home' && !p.isBot).length;
-    const awayH = this.players.filter(p => p.team === 'away' && !p.isBot).length;
-    const preferTeam: Team = homeH <= awayH ? 'home' : 'away';
-    let slot = this.players.find(p => p.isBot && p.team === preferTeam)
-      || this.players.find(p => p.isBot);
-    if (!slot) return null;
-    slot.isBot = false; slot.socketId = socketId;
-    slot.name = name && name.trim() ? name.trim().slice(0, 14) : 'Baller';
+    const homeH = this.players.filter(p => p.team === 'home').length;
+    const awayH = this.players.filter(p => p.team === 'away').length;
+    if (homeH + awayH >= 6) return null;
+    // balance teams, respect 3-per-side cap
+    let team: Team = homeH <= awayH ? 'home' : 'away';
+    if (team === 'home' && homeH >= 3) team = 'away';
+    if (team === 'away' && awayH >= 3) team = 'home';
+    const slot = this.makeHuman(team, name && name.trim() ? name.trim().slice(0, 14) : 'Baller', socketId);
+    this.players.push(slot);
     this.inputs.set(slot.id, emptyInput());
-    if (this.status === 'waiting') this.status = 'playing';
+    this.checkStart();
     return slot;
   }
 
   removeHuman(socketId: string) {
-    const slot = this.players.find(p => p.socketId === socketId);
-    if (!slot) return;
-    slot.isBot = true; slot.socketId = null;
+    const i = this.players.findIndex(p => p.socketId === socketId);
+    if (i < 0) return;
+    const [slot] = this.players.splice(i, 1);
     this.inputs.delete(slot.id);
-    if (!this.hasHumans()) this.resetMatch();   // empty room resets to a fresh idle game
+    this.ack.delete(slot.id);
+    if (this.ball.owner === slot.id) { this.ball.owner = null; this.ball.inFlight = true; }
+    if (!this.hasHumans()) this.resetMatch();   // empty room → idle reset
+    else this.checkStart();                     // dropped below 1v1 → back to waiting
+  }
+
+  // Start the match once both teams have at least one human (1v1 minimum).
+  private checkStart() {
+    if (this.bothTeamsPresent()) {
+      if (this.status === 'waiting') {
+        this.status = 'playing';
+        this.scoreHome = 0; this.scoreAway = 0; this.timeLeft = MATCH_SECONDS;
+        this.possession = 'home'; this.toast = '';
+        this.afterScoreReset();   // line everyone up + tip off the ball
+      }
+    } else if (this.status === 'playing') {
+      this.status = 'waiting';    // a side emptied mid-game → pause
+    }
   }
 
   setInput(slotId: number, input: Input) {
@@ -102,11 +115,8 @@ export class Room {
   }
 
   snapshot(): RoomState {
-    // stamp each human slot with the last input seq we processed (for client reconciliation)
-    for (const p of this.players) {
-      if (!p.isBot) p.ack = this.ack.get(p.id) ?? 0;
-      else if (p.ack !== undefined) p.ack = undefined;
-    }
+    // stamp each slot with the last input seq we processed (for client reconciliation)
+    for (const p of this.players) p.ack = this.ack.get(p.id) ?? 0;
     const s: RoomState = {
       code: this.code, status: this.status, scoreHome: this.scoreHome, scoreAway: this.scoreAway,
       timeLeft: this.timeLeft, players: this.players, ball: this.ball,
@@ -192,7 +202,6 @@ export class Room {
 
     // apply human inputs
     for (const p of this.players) {
-      if (p.isBot) { this.aiThink(p, dt); continue; }
       const inp = this.inputs.get(p.id) || emptyInput();
       if (p.stunT > 0) p.stunT -= dt;
       if (this.resetT <= 0 && p.stunT <= 0) {
@@ -228,9 +237,11 @@ export class Room {
     if (this.timeLeft <= 0 && this.status === 'playing') {
       this.status = 'ended'; this.endedAt = Date.now();
     }
-    // auto-restart an ended match a few seconds later if humans remain
+    // auto-restart an ended match a few seconds later if both teams still present
     if (this.status === 'ended' && Date.now() - this.endedAt > 6000) {
-      if (this.hasHumans()) this.resetMatchKeepHumans(); else this.resetMatch();
+      if (this.bothTeamsPresent()) this.resetMatchKeepHumans();
+      else if (this.hasHumans()) { this.status = 'waiting'; }
+      else this.resetMatch();
     }
   }
 
@@ -255,7 +266,7 @@ export class Room {
     if (this.grabLock <= 0) {
       for (const p of this.players) {
         const hx = p.x, hy = p.y - PLAYER_H * 0.5;
-        if (Math.hypot(b.x - hx, b.y - hy) < 46) { if (p.isBot) { this.giveBallTo(p); break; } }
+        if (Math.hypot(b.x - hx, b.y - hy) < 46) { this.giveBallTo(p); break; }
       }
     }
   }
@@ -284,7 +295,7 @@ export class Room {
       this.ball.owner = null; this.ball.inFlight = true;
       this.ball.x = rim.x; this.ball.y = rim.y - 6; this.ball.vx = 0; this.ball.vy = 240;
       this.grabLock = 0.3;
-      this.toast = h.isBot ? 'DUNK!' : 'SLAM DUNK! 🔥';
+      this.toast = 'SLAM DUNK! 🔥';
       this.fx.push({ kind: 'dunk', team: h.team, x: rim.x, y: rim.y });
     }
   }
@@ -306,43 +317,8 @@ export class Room {
       p.y = FLOOR_Y; p.vx = p.vy = 0; p.onGround = true; p.stunT = 0; p.faceDir = homeSide ? 1 : -1;
     }
     const taker = this.players.find(p => p.team === this.possession) || this.players[0];
-    this.giveBallTo(taker); this.toast = '';
-  }
-
-  // ---- AI (same shape as client) ----
-  private aiThink(p: NetPlayer, dt: number) {
-    if (this.resetT > 0 || this.status !== 'playing') { p.vx *= 0.8; return; }
-    if (p.stunT > 0) { p.stunT -= dt; p.vx *= 0.8; return; }
-    const has = this.ball.owner === p.id;
-    const teamHasBall = this.possession === p.team;
-    const rim = targetRim(p.team);
-    if (has) {
-      const dist = Math.abs(rim.x - p.x); p.faceDir = rim.x > p.x ? 1 : -1;
-      if (dist > 360) p.vx = MOVE * p.faceDir;
-      else {
-        p.vx *= FRICTION;
-        if (Math.random() < dt * 0.6) {
-          if (Math.random() < 0.25) { const m = this.players.find(q => q.team === p.team && q.id !== p.id); if (m) this.launch(m.x, m.y - PLAYER_H * 0.5, 1, p); }
-          else this.shootAt(p, rim, 0.8 + Math.random() * 0.2);
-        } else if (p.onGround && Math.random() < dt * 1.2) this.jump(p);
-      }
-    } else if (teamHasBall) {
-      const mates = this.players.filter(q => q.team === p.team); const lane = mates.indexOf(p);
-      this.seek(p, rim.x - p.faceDir * 150 + (lane - 1) * 240, 0.55);
-    } else {
-      const h = this.holder();
-      const defs = this.players.filter(q => q.team === p.team).sort((a, b) => Math.abs(a.x - this.ball.x) - Math.abs(b.x - this.ball.x));
-      const role = defs.indexOf(p);
-      if (role === 0) this.seek(p, h ? h.x : this.ball.x, 1);
-      else this.seek(p, rim.x + p.faceDir * (180 + role * 160), 0.6);
-      if (h && h.team !== p.team && Math.abs(h.x - p.x) < 52 && Math.abs(h.y - p.y) < 60 && p.reachT <= 0 && Math.random() < dt * 0.5) {
-        p.reachT = 1; if (Math.random() < 0.22) { this.giveBallTo(p); h.stunT = 0.25; }
-      }
-      if (this.ball.inFlight && p.onGround && Math.abs(this.ball.x - p.x) < 50 && this.ball.y < p.y - 40 && Math.random() < dt * 2) this.jump(p);
-    }
-  }
-  private seek(p: NetPlayer, tx: number, aggr: number) {
-    const dx = tx - p.x;
-    if (Math.abs(dx) > 14) { p.vx = MOVE * aggr * Math.sign(dx); p.faceDir = Math.sign(dx) as 1 | -1; } else p.vx *= FRICTION;
+    if (taker) { this.giveBallTo(taker); }
+    else { this.ball.owner = null; this.ball.inFlight = true; this.ball.x = WORLD_W / 2; this.ball.y = FLOOR_Y - 200; this.ball.vx = this.ball.vy = 0; }
+    this.toast = '';
   }
 }

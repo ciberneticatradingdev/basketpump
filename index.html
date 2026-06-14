@@ -18,27 +18,11 @@
 
           <div class="menu-card">
             <div class="menu-row">
-              <span class="lbl">MODE</span>
-              <div class="seg" id="seg-mode">
-                <button class="seg-btn active" data-mode="quick">Quick Match</button>
-                <button class="seg-btn" data-mode="ranked">Ranked</button>
-                <button class="seg-btn" data-mode="practice">Practice</button>
-              </div>
-            </div>
-            <div class="menu-row">
-              <span class="lbl">MATCH LENGTH</span>
-              <div class="seg" id="seg-time">
-                <button class="seg-btn" data-min="3">3 MIN</button>
-                <button class="seg-btn active" data-min="5">5 MIN</button>
-                <button class="seg-btn" data-min="7">7 MIN</button>
-              </div>
-            </div>
-            <button id="play-btn" class="play-btn">▶ PLAY <span class="btn-sub">vs CPU</span></button>
-            <div class="menu-row">
               <span class="lbl">YOUR NAME</span>
               <input id="name-input" class="name-input" maxlength="14" placeholder="Baller" />
             </div>
-            <button id="online-btn" class="online-btn">🌐 PLAY ONLINE <span class="btn-sub">3v3 real-time</span></button>
+            <button id="online-btn" class="online-btn">🏀 QUICK MATCH <span class="btn-sub">3v3 online · 3 min</span></button>
+            <button id="play-btn" class="play-btn">▶ PRACTICE <span class="btn-sub">vs CPU</span></button>
           </div>
 
           <div class="controls-hint">
@@ -57,7 +41,7 @@
               <span id="net-dot" class="net-dot">○ connecting…</span>
               <button id="lobby-close" class="lobby-close">✕</button>
             </div>
-            <p class="lobby-sub">Jump into a real-time 3v3. Empty spots are filled by AI ballers.</p>
+            <p class="lobby-sub">Real-time 3v3. Need at least 1v1 to tip off — grab a friend or wait for a baller to join.</p>
             <div id="rooms-list" class="rooms-list"></div>
             <button id="quickplay-btn" class="play-btn quickplay">⚡ QUICK PLAY <span class="btn-sub">auto-join</span></button>
           </div>

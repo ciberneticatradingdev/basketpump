@@ -18,7 +18,7 @@ const ballTagEl = $('#ball-tag'), hintEl = $('#action-hint');
 const gameoverEl = $('#gameover');
 const lobbyEl = $('#lobby'), roomsListEl = $('#rooms-list'), netDot = $('#net-dot'), nameInput = $('#name-input') as HTMLInputElement;
 
-let cfg: MatchConfig = { mode: 'quick', minutes: 5 };
+let cfg: MatchConfig = { mode: 'practice', minutes: 3 };
 let engine: Engine | null = null;
 let raf = 0;
 let mode: 'offline' | 'online' = 'offline';
@@ -68,9 +68,12 @@ function renderRooms(rooms: RoomSummary[]) {
     const full = r.humans >= r.capacity;
     const card = document.createElement('button');
     card.className = 'room-card' + (full ? ' full' : '');
+    const statusLabel = r.status === 'playing' ? 'LIVE'
+      : r.status === 'ended' ? 'ENDING'
+      : r.humans > 0 ? 'WAITING' : 'OPEN';
     card.innerHTML = `
       <div class="room-top"><span class="room-name">${r.code}</span>
-        <span class="room-status ${r.status}">${r.status === 'playing' ? 'LIVE' : r.status === 'ended' ? 'ENDING' : 'OPEN'}</span></div>
+        <span class="room-status ${r.status}">${statusLabel}</span></div>
       <div class="room-mid">${r.scoreHome} : ${r.scoreAway}</div>
       <div class="room-bot"><span class="room-players">👤 ${r.humans}/${r.capacity}</span>
         <span class="room-join">${full ? 'FULL' : 'JOIN ▶'}</span></div>`;
@@ -82,22 +85,13 @@ function renderRooms(rooms: RoomSummary[]) {
 function playerName() { return (nameInput?.value || '').trim() || 'Baller'; }
 
 // ---------- MENU ----------
-$('#seg-mode').addEventListener('click', e => {
-  const b = (e.target as HTMLElement).closest('.seg-btn') as HTMLElement; if (!b) return;
-  $('#seg-mode').querySelectorAll('.seg-btn').forEach(x => x.classList.remove('active'));
-  b.classList.add('active'); cfg.mode = b.dataset.mode as MatchConfig['mode'];
-});
-$('#seg-time').addEventListener('click', e => {
-  const b = (e.target as HTMLElement).closest('.seg-btn') as HTMLElement; if (!b) return;
-  $('#seg-time').querySelectorAll('.seg-btn').forEach(x => x.classList.remove('active'));
-  b.classList.add('active'); cfg.minutes = parseInt(b.dataset.min!);
-});
-$('#play-btn').addEventListener('click', () => startMatch());
+// Two modes only: Practice (offline vs CPU) and Quick Match (online 3v3, fixed 3 min).
+$('#play-btn').addEventListener('click', () => startMatch());          // PRACTICE
 $('#quit-btn').addEventListener('click', () => leaveGame());
 $('#go-menu').addEventListener('click', () => leaveGame());
 $('#go-rematch').addEventListener('click', () => { gameoverEl.classList.add('hidden'); if (mode === 'offline') startMatch(); });
 
-// online lobby controls
+// online lobby controls — QUICK MATCH opens the live arenas
 $('#online-btn').addEventListener('click', () => { lobbyEl.classList.add('open'); ensureNet().listRooms(); });
 $('#lobby-close').addEventListener('click', () => lobbyEl.classList.remove('open'));
 $('#quickplay-btn').addEventListener('click', () => { Audio.resumeAudio(); ensureNet().quickPlay(playerName()); });
@@ -379,6 +373,20 @@ function renderOnline(_dt: number) {
     drawBall(ctx, ball, holderOf(s));
     drawParticles(ctx, clientParticles);
     if (charging && me && s.ball.owner === me.id) drawChargeRail(ctx, charge);
+    // waiting for a 1v1 minimum → show a banner over the (idle) court
+    if (s.status === 'waiting') {
+      ctx.fillStyle = 'rgba(5,7,15,.62)';
+      ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+      const homeN = s.players.filter(p => p.team === 'home').length;
+      const awayN = s.players.filter(p => p.team === 'away').length;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#7dff43'; ctx.font = '900 46px Segoe UI, sans-serif';
+      ctx.fillText('WAITING FOR OPPONENT…', WORLD_W / 2, WORLD_H / 2 - 18);
+      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = '700 26px Segoe UI, sans-serif';
+      ctx.fillText(`HOME ${homeN}  vs  ${awayN} AWAY · need at least 1v1 to tip off`, WORLD_W / 2, WORLD_H / 2 + 28);
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '600 20px Segoe UI, sans-serif';
+      ctx.fillText('Share the link or open a second arena tab to test', WORLD_W / 2, WORLD_H / 2 + 64);
+    }
   } else {
     // connecting…
     ctx.fillStyle = 'rgba(125,255,67,.9)'; ctx.font = '900 30px Segoe UI, sans-serif';

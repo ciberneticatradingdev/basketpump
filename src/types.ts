@@ -49,6 +49,6 @@ export interface Ball {
 }
 
 export interface MatchConfig {
-  mode: 'quick' | 'ranked' | 'practice';
+  mode: 'quick' | 'practice';
   minutes: number;
 }
