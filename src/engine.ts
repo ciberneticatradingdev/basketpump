@@ -57,7 +57,7 @@ export class Engine {
 
   private spawnTeams() {
     let id = 1;
-    // 3 home (attack right), 3 away (attack left)
+    // 1v1: 1 home (attack right) vs 1 away (attack left)
     const make = (team: Team, idx: number, names: string[]): Player => {
       const homeSide = team === 'home';
       const baseX = homeSide ? WORLD_W * 0.32 : WORLD_W * 0.68;
@@ -71,8 +71,8 @@ export class Engine {
         armT: 0, reachT: 0, stunT: 0, pumpT: 0, runPhase: Math.random() * 6, dunkT: 0,
       };
     };
-    for (let i = 0; i < 3; i++) this.players.push(make('home', i, HOME_NAMES));
-    for (let i = 0; i < 3; i++) this.players.push(make('away', i, AWAY_NAMES));
+    for (let i = 0; i < 1; i++) this.players.push(make('home', i, HOME_NAMES));
+    for (let i = 0; i < 1; i++) this.players.push(make('away', i, AWAY_NAMES));
     this.user = this.players[0];
     this.user.isUser = true;
     this.user.name = 'YOU';
