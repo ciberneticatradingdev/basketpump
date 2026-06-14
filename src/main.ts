@@ -464,7 +464,7 @@ console.log('%cBASKETPUMP', 'color:#7dff43;font-weight:900;font-size:20px', '—
 
 // ---------- CONTRACT ADDRESS ----------
 // Set this string when the token launches; until then it shows "will update soon".
-const CONTRACT_ADDRESS = ''; // e.g. 'So1aNa...pump'
+const CONTRACT_ADDRESS = '3uHWoFugJeBw7bf8SZcemS1Ma49fD19rW3z8JdV3pump'; // e.g. 'So1aNa...pump'
 (() => {
   const chip = document.querySelector('#ca-chip') as HTMLButtonElement | null;
   const valEl = document.querySelector('#ca-value') as HTMLElement | null;
