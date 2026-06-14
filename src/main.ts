@@ -195,7 +195,7 @@ function startOnlineMatch() {
   gameoverEl.classList.add('hidden'); lobbyEl.classList.remove('open'); resize();
   Audio.resumeAudio(); Audio.startCrowd();
   charging = false; charge = 0; clientParticles.length = 0;
-  self.init = false; // fresh prediction state for this match
+  self.init = false; pendingInputs.length = 0; inputSeq = 0; // fresh prediction state for this match
   if (import.meta.env.DEV) { (window as any).__net = net; (window as any).__self = self; }
   showToast('Joined ' + (net?.assigned?.code || ''));
   startLoop();
@@ -253,66 +253,91 @@ const clientParticles: Particle[] = [];
 let clientShake = 0;
 let lastToast = '';
 
-// ===== client-side prediction (own player only) =====
-// Mirrors the authoritative movement physics in server/src/room.ts so the local
-// player reacts to input on the SAME frame (0ms feel) instead of waiting a full
-// network round-trip. Remote players + ball stay interpolated via net.sample().
+// ===== client-side prediction + server reconciliation (Gambetta/Valve model) =====
+// Own player: predicted locally every frame (0ms input feel) AND reconciled against
+// the server WITHOUT the 30Hz tug-of-war that caused self-stutter. On each snapshot we
+// reset to the authoritative position, then REPLAY every input the server hasn't acked
+// yet — so the predicted player lands exactly where prediction said, correcting only on
+// real divergence (steal/collision), never visibly. Remote players + loose ball stay
+// interpolated via net.sample().
 const PRED = { GRAV: 2100, MOVE: 430, AIR_MOVE: 300, JUMP_V: 880, FRICTION: 0.82 };
-interface SelfPred { x: number; y: number; vx: number; vy: number; onGround: boolean; faceDir: 1 | -1; armT: number; init: boolean; }
-const self: SelfPred = { x: 0, y: 0, vx: 0, vy: 0, onGround: true, faceDir: 1, armT: 0, init: false };
+interface SelfState { x: number; y: number; vx: number; vy: number; onGround: boolean; faceDir: 1 | -1; }
+interface StampedInput { seq: number; dt: number; left: boolean; right: boolean; jump: boolean; stunned: boolean; }
+const self = { x: 0, y: 0, vx: 0, vy: 0, onGround: true, faceDir: 1 as 1 | -1, armT: 0, init: false };
+let inputSeq = 0;
+const pendingInputs: StampedInput[] = []; // inputs sent but not yet acked by server
 
-function predictSelf(dt: number, inp: { left: boolean; right: boolean; jump: boolean }, stunned: boolean) {
-  if (!self.init) return;
+// Pure movement step — identical math to server room.ts tick(). Mutates `st`.
+function stepMovement(st: SelfState, inp: { left: boolean; right: boolean; jump: boolean }, stunned: boolean, dt: number) {
   if (!stunned) {
-    const accel = self.onGround ? PRED.MOVE : PRED.AIR_MOVE;
-    if (inp.left) { self.vx = -accel; self.faceDir = -1; }
-    else if (inp.right) { self.vx = accel; self.faceDir = 1; }
-    else if (self.onGround) self.vx *= PRED.FRICTION;
-    if (inp.jump && self.onGround) { self.vy = -PRED.JUMP_V; self.onGround = false; }
-  } else if (self.onGround) self.vx *= PRED.FRICTION;
-  if (!self.onGround) self.vy += PRED.GRAV * dt;
-  self.x += self.vx * dt; self.y += self.vy * dt;
+    const accel = st.onGround ? PRED.MOVE : PRED.AIR_MOVE;
+    if (inp.left) { st.vx = -accel; st.faceDir = -1; }
+    else if (inp.right) { st.vx = accel; st.faceDir = 1; }
+    else if (st.onGround) st.vx *= PRED.FRICTION;
+    if (inp.jump && st.onGround) { st.vy = -PRED.JUMP_V; st.onGround = false; }
+  } else if (st.onGround) st.vx *= PRED.FRICTION;
+  if (!st.onGround) st.vy += PRED.GRAV * dt;
+  st.x += st.vx * dt; st.y += st.vy * dt;
   const minX = WALL + PLAYER_W / 2, maxX = WORLD_W - WALL - PLAYER_W / 2;
-  if (self.x < minX) { self.x = minX; self.vx = 0; }
-  if (self.x > maxX) { self.x = maxX; self.vx = 0; }
-  if (self.y >= FLOOR_Y) { self.y = FLOOR_Y; self.vy = 0; self.onGround = true; } else self.onGround = false;
-  self.armT = Math.max(0, self.armT - dt * 3);
+  if (st.x < minX) { st.x = minX; st.vx = 0; }
+  if (st.x > maxX) { st.x = maxX; st.vx = 0; }
+  if (st.y >= FLOOR_Y) { st.y = FLOOR_Y; st.vy = 0; st.onGround = true; } else st.onGround = false;
 }
 
-// Soft reconciliation against the authoritative snapshot. Tiny steady-state error
-// (we're ahead of the server by ~latency) is blended out invisibly; big divergence
-// (steal, score reset, teleport) snaps hard so we never desync.
+// Apply this frame's input locally (instant feel) and record it for later replay.
+function predictSelf(dt: number, inp: { left: boolean; right: boolean; jump: boolean }, stunned: boolean): number {
+  if (!self.init) return inputSeq;
+  const seq = ++inputSeq;
+  pendingInputs.push({ seq, dt, left: inp.left, right: inp.right, jump: inp.jump, stunned });
+  if (pendingInputs.length > 240) pendingInputs.shift(); // ~4s safety cap
+  stepMovement(self, inp, stunned, dt);
+  self.armT = Math.max(0, self.armT - dt * 3);
+  return seq;
+}
+
+// On each authoritative snapshot: seed (first time) or reconcile by replaying unacked inputs.
 function reconcileSelf(sp: NetPlayer) {
   if (!self.init) {
     self.x = sp.x; self.y = sp.y; self.vx = sp.vx; self.vy = sp.vy;
     self.onGround = sp.onGround; self.faceDir = sp.faceDir; self.armT = sp.armT; self.init = true;
+    pendingInputs.length = 0;
     return;
   }
-  const ex = sp.x - self.x, ey = sp.y - self.y;
-  if (Math.hypot(ex, ey) > 140) {            // hard divergence → snap to authority
-    self.x = sp.x; self.y = sp.y; self.vx = sp.vx; self.vy = sp.vy; self.onGround = sp.onGround;
-  } else {                                    // gentle positional blend, keep predicted velocity
-    self.x += ex * 0.18;
-    self.y += ey * 0.30;
+  const ack = sp.ack ?? 0;
+  // drop inputs the server has already processed
+  while (pendingInputs.length && pendingInputs[0].seq <= ack) pendingInputs.shift();
+  // start from the authoritative state, then re-apply everything still in flight
+  const st: SelfState = { x: sp.x, y: sp.y, vx: sp.vx, vy: sp.vy, onGround: sp.onGround, faceDir: sp.faceDir };
+  for (const inp of pendingInputs) stepMovement(st, inp, inp.stunned, inp.dt);
+  // If the replayed result is within a sane window, accept it outright (no tug-of-war).
+  // Only a large gap (genuine desync — steal/teleport) is worth a hard correction.
+  const err = Math.hypot(st.x - self.x, st.y - self.y);
+  if (err > 220) { // hard desync → snap
+    self.x = st.x; self.y = st.y; self.vx = st.vx; self.vy = st.vy; self.onGround = st.onGround; self.faceDir = st.faceDir;
+  } else {
+    // accept replayed authority fully — it already includes our pending inputs, so there's
+    // no backward pull; tiny residual differences come only from float drift.
+    self.x = st.x; self.y = st.y; self.vx = st.vx; self.vy = st.vy; self.onGround = st.onGround;
   }
-  self.armT = sp.armT;                        // arm pose is server-driven (shoot/dunk)
+  self.armT = sp.armT;
 }
 
 function updateOnline(dt: number) {
   if (!net) return;
   if (charging) charge = Math.min(1, charge + dt * 0.85);
-  // send input snapshot
-  const p: InputPayload = {
-    left: !!keys['a'], right: !!keys['d'],
-    jump: edgeJump, grab: edgeGrab, pass: edgePass,
-    charging, shootPower: pendingShoot,
-  };
-  net.sendInput(p);
-  edgeJump = edgeGrab = edgePass = false; pendingShoot = 0;
 
   // predict own player locally so movement feels instant (0ms), independent of ping
   const stunned = !!(net.state && mySlot(net.state) && (mySlot(net.state)!.stunT > 0));
-  predictSelf(dt, { left: p.left, right: p.right, jump: p.jump }, stunned);
+  const seq = predictSelf(dt, { left: !!keys['a'], right: !!keys['d'], jump: edgeJump }, stunned);
+
+  // send input snapshot (stamped with seq so the server can ack it)
+  const p: InputPayload = {
+    left: !!keys['a'], right: !!keys['d'],
+    jump: edgeJump, grab: edgeGrab, pass: edgePass,
+    charging, shootPower: pendingShoot, seq,
+  };
+  net.sendInput(p);
+  edgeJump = edgeGrab = edgePass = false; pendingShoot = 0;
 
   // ball-tag / hint reflect the newest raw state (cheap, no interpolation needed).
   // Score, timer, fx, toasts and sounds are handled once-per-snapshot in onSnapshot().

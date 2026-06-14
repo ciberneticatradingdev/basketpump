@@ -27,6 +27,7 @@ export class Room {
   flashHome = 0; flashAway = 0;
   toast = '';
   private inputs = new Map<number, Input>();   // slotId -> latest input
+  private ack = new Map<number, number>();      // slotId -> last processed input seq
   private fx: NetParticleEvent[] = [];
   private resetT = 0;
   private possession: Team = 'home';
@@ -84,6 +85,7 @@ export class Room {
 
   setInput(slotId: number, input: Input) {
     this.inputs.set(slotId, input);
+    if (typeof input.seq === 'number') this.ack.set(slotId, input.seq);
   }
 
   private resetMatch() {
@@ -100,6 +102,11 @@ export class Room {
   }
 
   snapshot(): RoomState {
+    // stamp each human slot with the last input seq we processed (for client reconciliation)
+    for (const p of this.players) {
+      if (!p.isBot) p.ack = this.ack.get(p.id) ?? 0;
+      else if (p.ack !== undefined) p.ack = undefined;
+    }
     const s: RoomState = {
       code: this.code, status: this.status, scoreHome: this.scoreHome, scoreAway: this.scoreAway,
       timeLeft: this.timeLeft, players: this.players, ball: this.ball,

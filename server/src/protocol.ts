@@ -13,6 +13,7 @@ export interface NetPlayer {
   onGround: boolean;
   armT: number; reachT: number; stunT: number; pumpT: number; runPhase: number; dunkT: number;
   hasBall: boolean;
+  ack?: number;          // last input seq the server processed for this slot (own-player reconciliation)
 }
 
 export interface NetBall {
@@ -54,6 +55,7 @@ export interface InputPayload {
   jump: boolean;             // edge: set true for one tick to jump
   grab: boolean; pass: boolean;
   charging: boolean; shootPower: number; // release: shootPower>0 means shoot this tick
+  seq?: number;              // monotonic client input sequence (for server reconciliation)
 }
 
 // server -> client assigned identity

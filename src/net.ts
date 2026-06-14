@@ -7,6 +7,7 @@ export interface NetPlayer {
   id: number; team: Team; name: string; isBot: boolean; socketId: string | null;
   x: number; y: number; vx: number; vy: number; faceDir: 1 | -1; onGround: boolean;
   armT: number; reachT: number; stunT: number; pumpT: number; runPhase: number; dunkT: number; hasBall: boolean;
+  ack?: number;   // last input seq the server processed for this slot
 }
 export interface NetBall { x: number; y: number; vx: number; vy: number; owner: number | null; inFlight: boolean; spin: number; }
 export interface NetParticleEvent { kind: 'score' | 'dunk'; team: Team; x: number; y: number; }
@@ -23,6 +24,7 @@ export interface RoomSummary {
 export interface InputPayload {
   left: boolean; right: boolean; jump: boolean; grab: boolean; pass: boolean;
   charging: boolean; shootPower: number;
+  seq?: number;   // monotonic client input sequence (for server reconciliation)
 }
 export interface Assigned { code: string; slotId: number; team: Team; }
 
