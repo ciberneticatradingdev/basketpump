@@ -105,61 +105,52 @@ export function drawHoops(ctx: CanvasRenderingContext2D, flash: { home: number; 
   drawHoop(ctx, 'right', flash.home);  // right hoop = home's target
 }
 
-function drawHoop(ctx: CanvasRenderingContext2D, side: 'left' | 'right', flash: number) {
+function drawHoop(ctx: CanvasRenderingContext2D, side: 'left' | 'right', _flash: number) {
   const poleX = side === 'left' ? POLE_X_L : POLE_X_R;
   const inward = side === 'left' ? 1 : -1;
   const rimX = poleX + inward * RIM_REACH;
-  const scored = flash > 0;
 
   ctx.save();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
 
-  // ---- pole (green-tinted chrome, BasketPump palette) ----
+  // ---- pole (gray iron/chrome) ----
   const pg = ctx.createLinearGradient(poleX - 8, 0, poleX + 8, 0);
-  pg.addColorStop(0, '#16331a'); pg.addColorStop(0.5, '#dff7d2'); pg.addColorStop(1, '#2c5a26');
+  pg.addColorStop(0, '#3a3f45'); pg.addColorStop(0.5, '#c8ced6'); pg.addColorStop(1, '#4a5057');
   ctx.fillStyle = pg;
   roundRect(ctx, poleX - 7, RIM_Y - 30, 14, FLOOR_Y - (RIM_Y - 30), 7); ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1.5;
   roundRect(ctx, poleX - 7, RIM_Y - 30, 14, FLOOR_Y - (RIM_Y - 30), 7); ctx.stroke();
-  // pole pad with BP
+  // pole pad (gray)
   const padY = RIM_Y + 120;
   const padg = ctx.createLinearGradient(poleX - 11, padY, poleX + 11, padY);
-  padg.addColorStop(0, '#3a9e1c'); padg.addColorStop(0.5, '#7dff43'); padg.addColorStop(1, '#3a9e1c');
+  padg.addColorStop(0, '#4a4f55'); padg.addColorStop(0.5, '#9aa0a8'); padg.addColorStop(1, '#4a4f55');
   ctx.fillStyle = padg;
   roundRect(ctx, poleX - 11, padY, 22, 120, 8); ctx.fill();
-  ctx.fillStyle = '#0a1f08'; ctx.font = '900 13px Segoe UI, sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.save(); ctx.translate(poleX, padY + 60); ctx.fillText('BP', 0, 0); ctx.restore();
 
-  // ---- backboard (bright branded green glass) ----
+  // ---- backboard (clear gray glass) ----
   const bbW = 16, bbH = 116;
   const bbX = side === 'left' ? poleX + 4 : poleX - 4 - bbW;
   const bbY = RIM_Y - 70;
   const bbg = ctx.createLinearGradient(bbX, bbY, bbX + bbW, bbY + bbH);
-  bbg.addColorStop(0, 'rgba(125,255,67,.96)'); bbg.addColorStop(1, 'rgba(58,158,28,.96)');
+  bbg.addColorStop(0, 'rgba(190,196,204,.55)'); bbg.addColorStop(1, 'rgba(120,126,134,.55)');
   ctx.fillStyle = bbg;
   roundRect(ctx, bbX, bbY, bbW, bbH, 5); ctx.fill();
-  // glow frame (brightens on score)
-  ctx.strokeStyle = scored ? '#eaffd8' : 'rgba(10,31,8,.55)';
-  ctx.lineWidth = scored ? 4 : 2.5;
-  if (scored) { ctx.shadowColor = '#7dff43'; ctx.shadowBlur = 20; }
+  // frame (gray)
+  ctx.strokeStyle = 'rgba(60,66,72,.85)';
+  ctx.lineWidth = 2.5;
   roundRect(ctx, bbX, bbY, bbW, bbH, 5); ctx.stroke();
-  ctx.shadowBlur = 0;
   // shooter's square (white, target on the inward face)
   const sqX = side === 'left' ? bbX + bbW - 9 : bbX + 1;
   ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5;
   ctx.strokeRect(sqX, RIM_Y - 24, 8, 24);
-  // BP mark on the board
-  ctx.fillStyle = 'rgba(10,31,8,.9)'; ctx.font = '900 11px Segoe UI, sans-serif';
-  ctx.save(); ctx.translate(bbX + bbW / 2, bbY + 16); ctx.fillText('BP', 0, 0); ctx.restore();
 
   // ---- rim arm + hanger ----
   ctx.strokeStyle = '#ff6a12'; ctx.lineWidth = 6;
   ctx.beginPath(); ctx.moveTo(side === 'left' ? bbX + bbW : bbX, RIM_Y); ctx.lineTo(rimX, RIM_Y); ctx.stroke();
 
-  // ---- net (drawn behind the rim front edge) ----
-  const netH = 46 + (scored ? Math.sin(flash * 26) * 5 : 0);
-  ctx.strokeStyle = scored ? 'rgba(125,255,67,.85)' : 'rgba(255,255,255,.72)';
+  // ---- net ----
+  const netH = 46;
+  ctx.strokeStyle = 'rgba(255,255,255,.72)';
   ctx.lineWidth = 1.5;
   const strands = 7;
   for (let i = 0; i <= strands; i++) {
@@ -177,16 +168,14 @@ function drawHoop(ctx: CanvasRenderingContext2D, side: 'left' | 'right', flash: 
     ctx.stroke();
   }
 
-  // ---- rim (chunky orange torus, green glow on score) ----
-  ctx.strokeStyle = scored ? '#7dff43' : '#ff7a1a';
-  ctx.lineWidth = scored ? 9 : 7;
-  if (scored) { ctx.shadowColor = '#7dff43'; ctx.shadowBlur = 24; }
+  // ---- rim (orange torus) ----
+  ctx.strokeStyle = '#ff7a1a';
+  ctx.lineWidth = 7;
   ctx.beginPath(); ctx.ellipse(rimX, RIM_Y, RIM_R, 8, 0, 0, Math.PI * 2); ctx.stroke();
   // front-edge highlight
-  ctx.strokeStyle = scored ? 'rgba(190,255,150,.9)' : 'rgba(255,180,90,.9)';
+  ctx.strokeStyle = 'rgba(255,180,90,.9)';
   ctx.lineWidth = 3;
   ctx.beginPath(); ctx.ellipse(rimX, RIM_Y + 1, RIM_R - 1, 7, 0, Math.PI * 0.08, Math.PI * 0.92); ctx.stroke();
-  ctx.shadowBlur = 0;
 
   ctx.restore();
 }
