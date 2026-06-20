@@ -481,7 +481,7 @@ const CONTRACT_ADDRESS = '3uHWoFugJeBw7bf8SZcemS1Ma49fD19rW3z8JdV3pump'; // e.g.
       } catch { /* clipboard blocked — no-op */ }
     });
   } else {
-    valEl.textContent = 'will update soon';
+    valEl.textContent = 'CA WILL UPDATE SOON';
     if (copyEl) copyEl.style.display = 'none';
     chip.style.cursor = 'default';
   }
